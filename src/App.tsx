@@ -297,7 +297,7 @@ function MainApp() {
   if (checkingTeamSession) {
     return (
       <main className="app-shell flex min-h-screen items-center justify-center p-6 text-white">
-        <div className="login-panel flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111621]/90 px-5 py-4 text-sm text-slate-300 shadow-2xl">
+        <div className="login-panel flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111218]/90 px-5 py-4 text-sm text-slate-300 shadow-2xl">
           <span className="h-2 w-2 animate-ping rounded-full bg-cyan-300" /> Verifying your approved squad access…
         </div>
       </main>
@@ -365,7 +365,7 @@ function MainApp() {
               onClick={handleLogoTap}
               className="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform"
             >
-              <div className="brand-icon w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+              <div className="brand-icon w-9 h-9 rounded-xl bg-gradient-to-tr from-ember-500 via-amber-400 to-yellow-300 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                 <Gamepad2 size={18} className="text-white" />
               </div>
               <div>
@@ -389,7 +389,7 @@ function MainApp() {
             {[
               { key: 'tournaments', label: 'Tournaments', icon: <Flame size={17} />, tint: 'text-indigo-400' },
               { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy size={17} />, tint: 'text-amber-400' },
-              { key: 'player_search', label: 'Player Search', icon: <Search size={17} />, tint: 'text-emerald-400' },
+              { key: 'player_search', label: 'Teams & Players', icon: <Search size={17} />, tint: 'text-emerald-400' },
             ].map((item) => {
               const active = activeTab === item.key || (item.key === 'tournaments' && activeTab === 'registered_teams');
               return (
@@ -403,7 +403,7 @@ function MainApp() {
                   className={`sidebar-link relative w-full flex items-center gap-3 px-3.5 py-3 text-[13px] font-bold rounded-xl transition-all ${
                     active
                       ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/10 text-white border border-indigo-500/30 shadow-lg shadow-indigo-900/20'
-                      : 'text-gray-400 hover:text-white hover:bg-[#161a25] border border-transparent'
+                      : 'text-gray-400 hover:text-white hover:bg-[#17181f] border border-transparent'
                   }`}
                 >
                   {active && <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r bg-indigo-400" />}
@@ -439,7 +439,7 @@ function MainApp() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-[#1a1e2c]"
+              className="md:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-[#1c1d26]"
             >
               <Menu size={20} />
             </button>
@@ -451,7 +451,7 @@ function MainApp() {
               onClick={handleLogoTap}
               className="md:hidden flex items-center gap-2"
             >
-              <div className="brand-icon w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-cyan-400 flex items-center justify-center">
+              <div className="brand-icon w-8 h-8 rounded-xl bg-gradient-to-tr from-ember-500 via-amber-400 to-yellow-300 flex items-center justify-center">
                 <Gamepad2 size={16} className="text-white" />
               </div>
               <span className="brand-wordmark font-extrabold text-sm tracking-wide">OG x o7</span>
@@ -501,12 +501,12 @@ function MainApp() {
               <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Tournament arena'
-                  : activeTab === 'leaderboard' ? 'Hall of champions' : 'Player directory'}
+                  : activeTab === 'leaderboard' ? 'Hall of champions' : 'Squad roster'}
               </h1>
               <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Find your next Free Fire scrim and secure your squad’s place.'
-                  : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Track squad registrations, match form and team earnings.'}
+                  : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Open any squad to see its players and how many matches each has played.'}
               </p>
             </div>
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
@@ -532,7 +532,7 @@ function MainApp() {
                     </div>
 
                     {/* Filter buttons */}
-                    <div className="flex items-center gap-1 bg-[#10131d] p-1 rounded-xl border border-[#212638] text-xs shrink-0">
+                    <div className="flex items-center gap-1 bg-[#0f1015] p-1 rounded-xl border border-[#23242e] text-xs shrink-0">
                       <button
                         onClick={() => setCategoryFilter('all')}
                         className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
@@ -592,7 +592,7 @@ function MainApp() {
                           className={`tournament-card relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4 shadow-xl ${
                             isSelected
                               ? 'border-indigo-500 shadow-indigo-500/20 ring-2 ring-indigo-500/40 scale-[1.01]'
-                              : 'border-[#22273a] hover:border-[#384260] bg-[#121520]'
+                              : 'border-[#25262f] hover:border-[#3a3b4a] bg-[#121520]'
                           }`}
                           style={{ animationDelay: `${index * 55}ms` }}
                         >
@@ -602,7 +602,7 @@ function MainApp() {
                             style={{ backgroundImage: `url(${bgImg})` }}
                           />
                           {/* Gradient Overlay for high text contrast */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#0b0e14] via-[#0b0e14]/75 to-[#0b0e14]/40" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#09090d] via-[#09090d]/75 to-[#09090d]/40" />
 
                           {/* Top Badges */}
                           <div className="relative z-10 flex items-center justify-between gap-1">
@@ -669,7 +669,7 @@ function MainApp() {
                                     setActiveTournament(tour);
                                     setActiveTab('registered_teams');
                                   }}
-                                  className="w-full py-1.5 bg-[#1b2030] text-gray-300 hover:text-white rounded-lg text-[10px] sm:text-xs font-semibold"
+                                  className="w-full py-1.5 bg-[#1e1f27] text-gray-300 hover:text-white rounded-lg text-[10px] sm:text-xs font-semibold"
                                 >
                                   View Teams
                                 </button>
@@ -686,7 +686,7 @@ function MainApp() {
               {/* Right Column: My Team + Top Teams */}
               <div className={PUBLIC_READ_ONLY ? 'hidden' : 'hidden lg:block lg:col-span-4 space-y-6'}>
                 {/* MY TEAM CARD */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-[#1a1f33] to-[#141722] border border-[#262c3e] rounded-2xl p-5 sm:p-6 shadow-xl">
+                <div className="relative overflow-hidden bg-gradient-to-br from-[#1d1a1a] to-[#131419] border border-[#282934] rounded-2xl p-5 sm:p-6 shadow-xl">
                   <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
                   <div className="relative flex items-center gap-4 mb-4">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-700 border border-indigo-400/40 flex items-center justify-center shadow-lg shadow-indigo-600/20">
@@ -699,15 +699,15 @@ function MainApp() {
                   </div>
 
                   <div className="relative grid grid-cols-3 gap-2.5">
-                    <div className="bg-[#0e1118]/80 border border-[#202536] p-3 rounded-xl text-center">
+                    <div className="bg-[#0c0d11]/80 border border-[#22232c] p-3 rounded-xl text-center">
                       <div className="text-xl font-black text-amber-300">{myStanding ? myStanding.wins : 0}</div>
                       <div className="text-[10px] text-gray-400 font-medium mt-0.5">Wins</div>
                     </div>
-                    <div className="bg-[#0e1118]/80 border border-[#202536] p-3 rounded-xl text-center">
+                    <div className="bg-[#0c0d11]/80 border border-[#22232c] p-3 rounded-xl text-center">
                       <div className="text-xl font-black text-white">{myStanding ? myStanding.matches : 0}</div>
                       <div className="text-[10px] text-gray-400 font-medium mt-0.5">Matches</div>
                     </div>
-                    <div className="bg-[#0e1118]/80 border border-[#202536] p-3 rounded-xl text-center">
+                    <div className="bg-[#0c0d11]/80 border border-[#22232c] p-3 rounded-xl text-center">
                       <div className="text-xl font-black text-indigo-300">{myStanding ? `#${myStanding.rank}` : '—'}</div>
                       <div className="text-[10px] text-gray-400 font-medium mt-0.5">Rank</div>
                     </div>
@@ -715,8 +715,8 @@ function MainApp() {
                 </div>
 
                 {/* TOP TEAMS CARD */}
-                <div className="bg-[#131620] border border-[#212638] rounded-2xl p-5 sm:p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#1e2334]">
+                <div className="bg-[#131620] border border-[#23242e] rounded-2xl p-5 sm:p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#20212a]">
                     <h4 className="font-bold text-white text-sm flex items-center gap-2">
                       <Trophy size={15} className="text-amber-400" /> Top Teams
                     </h4>
@@ -746,7 +746,7 @@ function MainApp() {
                                   ? 'bg-slate-400/20 text-slate-200'
                                   : i === 2
                                   ? 'bg-orange-500/20 text-orange-300'
-                                  : 'bg-[#1b2030] text-gray-400'
+                                  : 'bg-[#1e1f27] text-gray-400'
                               }`}
                             >
                               {i + 1}

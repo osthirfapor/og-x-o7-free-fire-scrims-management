@@ -125,14 +125,14 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               id="registration-team-name" autoComplete="organization" required maxLength={50} value={teamName}
               onChange={(event) => setTeamName(event.target.value)} placeholder="Enter your team name"
               disabled={isUnavailable}
-              className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#090c13]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+              className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
             />
           </div>
 
           <div className="space-y-2">
             <label htmlFor="registration-team-logo" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team logo <span className="text-rose-300">· required</span></label>
             <div className="flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#090c13]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#07080b]">
                 {teamLogo && logoImageReady ? <img src={teamLogo} alt="Team logo preview" className="h-full w-full object-cover" /> : <Gamepad2 size={19} className="text-slate-600" />}
               </div>
               {savedProfile?.teamLogo ? (
@@ -146,7 +146,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
                   onChange={(event) => { setTeamLogo(event.target.value); setLogoImageReady(false); setLogoName(event.target.value ? 'Checking image link…' : ''); }}
                   placeholder="Paste logo image link"
                   disabled={isUnavailable}
-                  className="registration-input block h-10 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3.5 text-xs font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+                  className="registration-input block h-10 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#07080b]/90 px-3.5 text-xs font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
                 />
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-600">or</span>
@@ -154,7 +154,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
                   id="registration-team-logo" type="file" accept="image/png,image/jpeg,image/webp"
                   onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}
                   disabled={isUnavailable}
-                  className="registration-input block h-9 min-w-0 flex-1 cursor-pointer rounded-xl border border-white/[.09] bg-[#090c13]/90 px-2.5 py-1.5 text-[10px] font-medium text-white outline-none transition file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-2.5 file:py-1 file:text-[9px] file:font-bold file:text-indigo-200 disabled:opacity-50"
+                  className="registration-input block h-9 min-w-0 flex-1 cursor-pointer rounded-xl border border-white/[.09] bg-[#07080b]/90 px-2.5 py-1.5 text-[10px] font-medium text-white outline-none transition file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-2.5 file:py-1 file:text-[9px] file:font-bold file:text-indigo-200 disabled:opacity-50"
                 />
                 </div>
                 <p className="truncate pl-1 text-[9px] text-slate-600">{logoName || 'PNG, JPG or WebP · max 8 MB'}</p>
@@ -181,7 +181,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
                     type="text" required maxLength={40} autoComplete="off" value={player.name}
                     onChange={(event) => updatePlayer(index, event.target.value)} placeholder="In-game name (IGN)"
                     disabled={isUnavailable}
-                    className="registration-input block h-12 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+                    className="registration-input block h-12 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#07080b]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
                   />
                 </label>
               ))}
@@ -196,7 +196,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
                   <button type="button" onClick={() => { updatePlayer(4, ''); setShowBackup(false); }} className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-white/[.06] hover:text-white">Remove</button>
                 </span>
               </span>
-              <input aria-label="Backup player IGN" type="text" maxLength={40} autoComplete="off" value={players[4].name} onChange={(event) => updatePlayer(4, event.target.value)} placeholder="Backup player IGN" disabled={isUnavailable} className="registration-input block h-12 min-w-0 w-full rounded-xl border border-amber-300/10 bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-amber-300/40 disabled:opacity-50" />
+              <input aria-label="Backup player IGN" type="text" maxLength={40} autoComplete="off" value={players[4].name} onChange={(event) => updatePlayer(4, event.target.value)} placeholder="Backup player IGN" disabled={isUnavailable} className="registration-input block h-12 min-w-0 w-full rounded-xl border border-amber-300/10 bg-[#07080b]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-amber-300/40 disabled:opacity-50" />
             </div>
           ) : (
             <button type="button" disabled={isUnavailable} onClick={() => setShowBackup(true)} className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[.13] bg-white/[.015] py-3 text-xs font-semibold text-slate-400 transition hover:border-amber-300/30 hover:bg-amber-300/[.035] hover:text-amber-100 disabled:opacity-40">
@@ -210,7 +210,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
 
           <footer className="flex flex-col-reverse gap-2.5 border-t border-white/[.07] pt-4 sm:flex-row sm:justify-end">
             <button type="button" onClick={onClose} className="rounded-xl border border-white/[.08] bg-white/[.035] px-5 py-3 text-xs font-semibold text-slate-300 transition hover:bg-white/[.08] hover:text-white">Cancel</button>
-            <button type="submit" disabled={loading || isUnavailable} className="action-primary flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="submit" disabled={loading || isUnavailable} className="action-primary flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-ember-600 to-amber-500 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
               {loading ? <><LoaderCircle size={15} className="animate-spin" /> Registering</> : <><Check size={15} /> Register squad</>}
             </button>
           </footer>
