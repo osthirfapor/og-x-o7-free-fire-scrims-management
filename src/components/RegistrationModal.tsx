@@ -1,18 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  AlertTriangle,
-  Users,
-  Shield,
-  Check,
-  Loader2,
-  Gamepad2,
-  RefreshCw,
-  Sparkles,
-  Edit2,
-  ArrowUpDown,
-} from 'lucide-react';
-import { Tournament, Team, Player, TeamProfile } from '../types/tournament';
+import React, { useState } from 'react';
+import { AlertCircle, Check, Gamepad2, LoaderCircle, Plus, ShieldCheck, UserRoundPlus, X } from 'lucide-react';
+import { Tournament, Team, Player } from '../types/tournament';
 import { registerTeam, getLocalTeamProfile } from '../services/tournamentService';
 
 interface Props {
@@ -21,359 +9,138 @@ interface Props {
   onClose: () => void;
 }
 
-export const RegistrationModal: React.FC<Props> = ({
-  tournament,
-  onSuccess,
-  onClose,
-}) => {
-  // Check saved profile for auto-refill
+export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose }) => {
   const savedProfile = getLocalTeamProfile();
-
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
-  const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
-
-  // 5 Players in-game names: 4 Main Players + 1 Backup Player
-  const [players, setPlayers] = useState<Player[]>(() => {
-    if (savedProfile?.players && savedProfile.players.length === 5) {
-      return savedProfile.players.map((p) => ({ ...p }));
-    }
-    return [
-      { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
-      { name: '', role: 'main', slotIndex: 2 },
-      { name: '', role: 'main', slotIndex: 3 },
-      { name: '', role: 'main', slotIndex: 4 },
-      { name: '', role: 'backup', slotIndex: 5 },
-    ];
-  });
-
-  const [editingPlayerIndex, setEditingPlayerIndex] = useState<number | null>(null);
+  const [players, setPlayers] = useState<Player[]>([
+    { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
+    { name: '', role: 'main', slotIndex: 2 },
+    { name: '', role: 'main', slotIndex: 3 },
+    { name: '', role: 'main', slotIndex: 4 },
+    { name: '', role: 'backup', slotIndex: 5 },
+  ]);
+  const [showBackup, setShowBackup] = useState(Boolean(savedProfile?.players?.some((player) => player.role === 'backup' && player.name.trim())));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // If local profile updates or loads
-  useEffect(() => {
-    if (savedProfile) {
-      if (!teamName && savedProfile.teamName) setTeamName(savedProfile.teamName);
-      if (!teamLogo && savedProfile.teamLogo) setTeamLogo(savedProfile.teamLogo);
-    }
-  }, [savedProfile]);
+  const isUnavailable = tournament.status !== 'open' || tournament.registeredCount >= tournament.maxTeams;
+  const updatePlayer = (index: number, name: string) => setPlayers((current) => current.map((player, i) => i === index ? { ...player, name } : player));
 
-  const handlePlayerNameChange = (index: number, value: string) => {
-    setPlayers((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], name: value };
-      return copy;
-    });
-  };
-
-  // Quick swap any main player with the 5th backup player
-  const handleSwapWithBackup = (mainIndex: number) => {
-    const backupIndex = 4;
-    setPlayers((prev) => {
-      const copy = [...prev];
-      const tempName = copy[mainIndex].name;
-      copy[mainIndex] = { ...copy[mainIndex], name: copy[backupIndex].name };
-      copy[backupIndex] = { ...copy[backupIndex], name: tempName };
-      return copy;
-    });
-  };
-
-  // Reset to saved profile data
-  const handleResetToProfile = () => {
-    if (savedProfile) {
-      setTeamName(savedProfile.teamName);
-      setTeamLogo(savedProfile.teamLogo);
-      if (savedProfile.players?.length === 5) {
-        setPlayers(savedProfile.players.map((p) => ({ ...p })));
-      }
-    }
-  };
-
-  const isFull = tournament.registeredCount >= tournament.maxTeams;
-  const isClosed = tournament.status !== 'open';
-  const remainingSlots = Math.max(0, tournament.maxTeams - tournament.registeredCount);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
-
-    if (isFull) {
-      setError(`Slots full! ${tournament.maxTeams}/${tournament.maxTeams} Teams registered.`);
-      return;
-    }
-
-    if (isClosed) {
-      setError('Registration is closed.');
-      return;
-    }
-
-    if (!teamName.trim()) {
-      setError('Enter a team name.');
-      return;
-    }
-
-    // Four starters are required; the fifth slot is an optional substitute.
-    for (let i = 0; i < 4; i++) {
-      const p = players[i];
-      if (!p.name.trim()) {
-        setError(`Enter Player #${i + 1}'s in-game name.`);
-        return;
-      }
-    }
-
-    // Duplicate name check
-    const filledPlayers = players.filter((player) => player.name.trim());
-    const names = filledPlayers.map((p) => p.name.trim().toLowerCase());
-    const uniqueNames = new Set(names);
-    if (uniqueNames.size !== names.length) {
-      setError('Player names must be unique.');
-      return;
-    }
+    if (isUnavailable) { setError('Registration is currently closed.'); return; }
+    if (!teamName.trim()) { setError('Enter your team name.'); return; }
+    const starters = players.slice(0, 4);
+    const backup = players[4];
+    const submittedPlayers = showBackup && backup.name.trim() ? [...starters, backup] : starters;
+    const names = submittedPlayers.map((player) => player.name.trim().toLowerCase());
+    if (starters.some((player) => !player.name.trim())) { setError('Enter all four player IGNs.'); return; }
+    if (new Set(names).size !== names.length) { setError('Each player must have a different IGN.'); return; }
 
     setLoading(true);
     try {
-      const leaderName = players[0].name.trim();
       const { team } = await registerTeam({
         tournament,
         teamName: teamName.trim(),
-        teamLogo,
-        leaderName,
-        players: filledPlayers,
+        teamLogo: savedProfile?.teamLogo || '',
+        leaderName: starters[0].name.trim(),
+        players: submittedPlayers,
       });
-
       onSuccess(team, tournament);
-    } catch (err: any) {
-      console.error('Registration failed:', err);
-      setError(err.message || 'Registration failed. Check details and try again.');
+    } catch (cause) {
+      console.error('Registration failed:', cause);
+      setError(cause instanceof Error ? cause.message : 'Could not register. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="registration-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm overflow-y-auto">
-      <div className="registration-card relative w-full max-w-lg bg-[#141722] border border-[#262b3d] rounded-2xl shadow-2xl p-5 sm:p-6 text-white my-6 max-h-[94vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-start justify-between pb-3.5 border-b border-[#212638]">
-          <div className="flex items-center gap-3">
-            {teamLogo ? (
-              <img
-                src={teamLogo}
-                alt="Team Logo"
-                className="w-10 h-10 rounded-xl object-cover border border-indigo-500/40 shadow-md"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <Gamepad2 className="text-white" size={22} />
-              </div>
-            )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold tracking-tight">Registration</h2>
-                <span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">
-                  {tournament.category || 'Practice'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-300 font-medium">
-                {tournament.name}
-              </p>
+    <div className="registration-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#03050a]/80 p-3 backdrop-blur-xl sm:p-6">
+      <section className="registration-card relative my-auto w-full max-w-xl overflow-hidden rounded-[28px] border border-white/[.1] bg-[#0e121c] text-white shadow-[0_40px_140px_rgba(0,0,0,.7)]">
+        <div className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-violet-600/15 blur-[95px]" />
+        <div className="pointer-events-none absolute -bottom-36 -left-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-[95px]" />
+
+        <header className="relative flex items-center justify-between border-b border-white/[.07] px-5 py-4 sm:px-7">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <div className="brand-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/20 bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-violet-950/40">
+              <Gamepad2 size={21} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">Squad registration</div>
+              <h2 className="mt-0.5 truncate text-sm font-bold text-white sm:text-base">{tournament.name}</h2>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#202536] transition-colors"
-          >
-            <X size={20} />
+          <button type="button" onClick={onClose} aria-label="Close registration" className="ml-3 rounded-xl border border-white/[.07] bg-white/[.035] p-2 text-slate-400 transition hover:border-white/20 hover:bg-white/[.08] hover:text-white">
+            <X size={17} />
           </button>
-        </div>
+        </header>
 
-        {/* Tournament Slot Status Compact Strip (No dropdown/selection box) */}
-        <div className="mt-3 bg-[#10131c] border border-[#212638] rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">Map: <strong className="text-white">{tournament.map || 'Bermuda'}</strong></span>
-            <span className="text-gray-600">•</span>
-            <span className="text-gray-400">{tournament.time}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                isFull
-                  ? 'bg-red-500/10 text-red-400 border-red-500/30'
-                  : isClosed
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-              }`}
-            >
-              {isFull ? 'SLOTS FULL' : isClosed ? 'CLOSED' : `${remainingSlots} SLOTS LEFT`}
-            </span>
-            <span className="text-gray-400 text-[11px]">
-              {tournament.registeredCount}/{tournament.maxTeams} Teams
-            </span>
-          </div>
-        </div>
-
-        {/* Auto-refill Indicator */}
-        {savedProfile && (
-          <div className="mt-2.5 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-between text-[11px] text-indigo-300">
-            <span className="flex items-center gap-1.5 font-medium">
-              <Sparkles size={13} className="text-indigo-400" /> Auto-refilled from saved Team Profile
-            </span>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-2.5 flex items-start gap-2.5 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs">
-            <AlertTriangle size={15} className="shrink-0 mt-0.5 text-red-400" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Scrollable Form Area */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto pr-1 flex-1 mt-3 space-y-4">
-          {/* Section 1: Team Name (Clean: No extra placeholder clutter) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-gray-300">
-                Team Name <span className="text-red-400">*</span>
-              </label>
-              {savedProfile && teamName !== savedProfile.teamName && (
-                <button
-                  type="button"
-                  onClick={() => setTeamName(savedProfile.teamName)}
-                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1"
-                >
-                  <RefreshCw size={10} /> Reset Name
-                </button>
-              )}
-            </div>
+        <form onSubmit={handleSubmit} className="relative space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="space-y-2">
+            <label htmlFor="registration-team-name" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team name</label>
             <input
-              type="text"
-              placeholder="Team Name"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              disabled={isFull || isClosed}
-              required
-              maxLength={50}
-              className="w-full bg-[#10131c] border border-[#272d42] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
+              id="registration-team-name" autoComplete="organization" required maxLength={50} value={teamName}
+              onChange={(event) => setTeamName(event.target.value)} placeholder="Enter your team name"
+              disabled={isUnavailable}
+              className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#090c13]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
             />
           </div>
 
-          {/* Section 2: Squad In-Game Names (4 Main + 1 Backup) */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Users size={14} /> Squad Players (In-Game Names)
-              </h4>
-              <span className="text-[10px] text-gray-400">4 players required · backup optional</span>
+              <label className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Player IGNs</label>
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-300"><ShieldCheck size={13} /> 4 required</span>
             </div>
-
-            <div className="space-y-1.5">
-              {players.map((p, idx) => {
-                const isLeader = idx === 0;
-                const isBackup = p.role === 'backup';
-                const isEditing = editingPlayerIndex === idx;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-2 p-2 rounded-xl border transition-colors ${
-                      isBackup
-                        ? 'bg-[#181622]/60 border-amber-500/30'
-                        : isLeader
-                        ? 'bg-[#131728] border-indigo-500/40'
-                        : 'bg-[#10131c] border-[#22273a]'
-                    }`}
-                  >
-                    {/* Role Tag */}
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border shrink-0 w-24 text-center ${
-                        isBackup
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                          : isLeader
-                          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                          : 'bg-gray-800 text-gray-300 border-gray-700'
-                      }`}
-                    >
-                      {isLeader ? '👑 Leader' : isBackup ? '🔄 Backup' : `Player #${p.slotIndex}`}
-                    </span>
-
-                    {/* In-Game Name Input (Directly editable) */}
+            <div className="grid gap-2.5">
+              {players.slice(0, 4).map((player, index) => (
+                <label key={player.slotIndex} className="registration-player-row flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5 transition-colors focus-within:border-indigo-300/35 focus-within:bg-indigo-300/[.035]" style={{ animationDelay: `${index * 55}ms` }}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-extrabold ${index === 0 ? 'border border-indigo-300/20 bg-indigo-400/10 text-indigo-200' : 'border border-white/[.06] bg-white/[.04] text-slate-400'}`}>
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="mb-1 block text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">{index === 0 ? 'Captain · required' : `Player ${index + 1} · required`}</span>
                     <input
-                      type="text"
-                      placeholder={
-                        isLeader
-                          ? 'Leader IGN'
-                          : isBackup
-                          ? 'Backup (5th) IGN'
-                          : `Player #${p.slotIndex} IGN`
-                      }
-                      value={p.name}
-                      onChange={(e) => handlePlayerNameChange(idx, e.target.value)}
-                      disabled={isFull || isClosed}
-                      required={!isBackup}
-                      maxLength={40}
-                      className="flex-1 bg-[#151926] border border-[#2b324b] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
+                      type="text" required maxLength={40} autoComplete="off" value={player.name}
+                      onChange={(event) => updatePlayer(index, event.target.value)} placeholder="In-game name (IGN)"
+                      disabled={isUnavailable}
+                      className="registration-input w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-slate-600 disabled:opacity-50"
                     />
-
-                    {/* Quick Swap with Backup (Player 5) Action */}
-                    {!isBackup ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSwapWithBackup(idx)}
-                        title="Swap with Backup Player (5th)"
-                        className="px-2 py-1 bg-[#1d2232] hover:bg-indigo-600/30 text-gray-300 hover:text-indigo-300 rounded-lg text-[10px] font-semibold border border-[#2e364e] flex items-center gap-1 transition-colors shrink-0"
-                      >
-                        <ArrowUpDown size={11} /> Swap P5
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-amber-400/80 px-2 py-1 bg-amber-500/10 rounded-lg shrink-0 font-medium">
-                        Sub
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Footer Submit Buttons */}
-          <div className="pt-3 border-t border-[#212638] flex items-center justify-between gap-3">
-            <span className="text-[11px] text-gray-400">
-              Free Fire Scrims • 4 + optional backup
-            </span>
+          {showBackup ? (
+            <label className="registration-player-row flex items-center gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-300/15 bg-amber-300/[.08] text-[11px] font-extrabold text-amber-200">05</span>
+              <span className="min-w-0 flex-1">
+                <span className="mb-1 block text-[9px] font-bold uppercase tracking-[.13em] text-amber-200/60">Backup · optional</span>
+                <input type="text" maxLength={40} autoComplete="off" value={players[4].name} onChange={(event) => updatePlayer(4, event.target.value)} placeholder="Backup player IGN" disabled={isUnavailable} className="registration-input w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-slate-600 disabled:opacity-50" />
+              </span>
+              <button type="button" onClick={() => { updatePlayer(4, ''); setShowBackup(false); }} className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-white/[.06] hover:text-white">Remove</button>
+            </label>
+          ) : (
+            <button type="button" disabled={isUnavailable} onClick={() => setShowBackup(true)} className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[.13] bg-white/[.015] py-3 text-xs font-semibold text-slate-400 transition hover:border-amber-300/30 hover:bg-amber-300/[.035] hover:text-amber-100 disabled:opacity-40">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[.06] transition group-hover:bg-amber-300/10"><Plus size={13} /></span>
+              Add backup player <span className="text-[10px] font-normal text-slate-600">(optional)</span>
+            </button>
+          )}
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3.5 py-2 bg-[#1e2334] hover:bg-[#272e44] text-gray-300 hover:text-white rounded-xl text-xs font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || isFull || isClosed}
-                className="flex items-center justify-center gap-1.5 px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" /> Registering...
-                  </>
-                ) : isFull ? (
-                  'Slots Full'
-                ) : isClosed ? (
-                  'Closed'
-                ) : (
-                  <>
-                    <Check size={14} /> Confirm Registration
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+          {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.07] px-3.5 py-3 text-xs leading-5 text-rose-200"><AlertCircle size={15} className="mt-0.5 shrink-0" />{error}</div>}
+          {isUnavailable && <div className="text-center text-xs font-semibold text-amber-200">Registration is closed.</div>}
+
+          <footer className="flex flex-col-reverse gap-2.5 border-t border-white/[.07] pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/[.08] bg-white/[.035] px-5 py-3 text-xs font-semibold text-slate-300 transition hover:bg-white/[.08] hover:text-white">Cancel</button>
+            <button type="submit" disabled={loading || isUnavailable} className="action-primary flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+              {loading ? <><LoaderCircle size={15} className="animate-spin" /> Registering</> : <><Check size={15} /> Register squad</>}
+            </button>
+          </footer>
+          <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-600"><UserRoundPlus size={11} /> Squad details only</div>
         </form>
-      </div>
+      </section>
     </div>
   );
 };
