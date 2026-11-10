@@ -624,8 +624,8 @@ function MainApp() {
                       <Shield size={28} className="text-white" />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-base text-white truncate">{teamProfile.teamName}</h4>
-                      <div className="text-xs text-gray-400 truncate">Leader: {teamProfile.leaderName}</div>
+                      <h4 className="font-extrabold text-base text-white truncate">{teamProfile?.teamName || 'No team selected'}</h4>
+                      <div className="text-xs text-gray-400 truncate">Leader: {teamProfile?.leaderName || 'Log in to view your team'}</div>
                     </div>
                   </div>
 
