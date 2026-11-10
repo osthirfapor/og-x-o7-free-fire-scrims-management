@@ -527,10 +527,10 @@ export const AdminPanelModal: React.FC<Props> = ({
             <form onSubmit={handlePasscodeSubmit} className="space-y-3">
               <div>
                 <input
-                  type="email"
+                  type="text"
                   required
                   autoComplete="username"
-                  placeholder="Admin email"
+                  placeholder="Admin username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"

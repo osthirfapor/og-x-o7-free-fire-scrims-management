@@ -21,7 +21,7 @@ Public visitors can browse tournaments, teams, and the leaderboard. Team self-re
 
 ## Firebase admin access
 
-The admin panel at `/?panel=admin` uses Firebase Email/Password Authentication. Enable the Email/Password provider under Firebase Authentication > Sign-in method. Create the admin account there, then add a Firestore document at `/admins/{uid}` using that account's Authentication UID as the document ID and `{ "enabled": true }` as its data. Only those allowlisted UIDs can see admin data or write. The client cannot create or edit admin allowlist documents.
+The admin panel at `/?panel=admin` uses Firebase Email/Password Authentication. Enter a full email or a username; usernames map to `{username}@ogxo7.com`. Enable the Email/Password provider under Firebase Authentication > Sign-in method. Create the matching Firebase account, then add a Firestore document at `/admins/{uid}` using that account's Authentication UID as the document ID and `{ "enabled": true }` as its data. Only those allowlisted UIDs can see admin data or write. The client cannot create or edit admin allowlist documents.
 
 `firestore.rules` keeps public tournament/team/result reads enabled, makes registration logs admin-only, and allows all writes only for allowlisted admins. Deploy the rules after signing in to the Firebase CLI:
 

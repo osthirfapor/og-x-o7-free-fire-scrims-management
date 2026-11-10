@@ -51,7 +51,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const loginWithCredentials = async (email: string, password: string) => {
-    const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+    const loginName = email.trim();
+    const authEmail = loginName.includes('@') ? loginName : `${loginName.toLowerCase()}@ogxo7.com`;
+    const credential = await signInWithEmailAndPassword(auth, authEmail, password);
     try {
       const allowed = await userHasAdminAccess(credential.user.uid);
       if (!allowed) {
