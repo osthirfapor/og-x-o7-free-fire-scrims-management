@@ -12,6 +12,8 @@ interface Props {
 export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose }) => {
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
+  const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
+  const [logoImageReady, setLogoImageReady] = useState(false);
   const [players, setPlayers] = useState<Player[]>([
     { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
     { name: '', role: 'main', slotIndex: 2 },
@@ -31,6 +33,11 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
     setError(null);
     if (isUnavailable) { setError('Registration is currently closed.'); return; }
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
+    let parsedLogoUrl: URL;
+    try { parsedLogoUrl = new URL(teamLogo.trim()); }
+    catch { setError('Enter a valid team logo image URL.'); return; }
+    if (!['http:', 'https:'].includes(parsedLogoUrl.protocol)) { setError('Logo URL must start with http or https.'); return; }
+    if (!logoImageReady) { setError('Wait for the team logo preview to load.'); return; }
     const starters = players.slice(0, 4);
     const backup = players[4];
     const submittedPlayers = showBackup && backup.name.trim() ? [...starters, backup] : starters;
@@ -43,7 +50,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
       const { team } = await registerTeam({
         tournament,
         teamName: teamName.trim(),
-        teamLogo: savedProfile?.teamLogo || '',
+        teamLogo: parsedLogoUrl.href,
         leaderName: starters[0].name.trim(),
         players: submittedPlayers,
       });
@@ -88,6 +95,25 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
             />
           </div>
 
+          <div className="space-y-2">
+            <label htmlFor="registration-team-logo" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team logo <span className="text-rose-300">· required</span></label>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#090c13]">
+                {teamLogo && logoImageReady ? <img src={teamLogo} alt="Team logo preview" className="h-full w-full object-cover" /> : <Gamepad2 size={19} className="text-slate-600" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <input
+                  id="registration-team-logo" type="url" required maxLength={500} autoComplete="url" value={teamLogo}
+                  onChange={(event) => { setTeamLogo(event.target.value); setLogoImageReady(false); }} placeholder="Paste a direct image URL"
+                  disabled={isUnavailable}
+                  className="registration-input block h-11 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+                />
+                <p className="mt-1 pl-1 text-[9px] text-slate-600">PNG, JPG, or WebP image link</p>
+              </div>
+              {teamLogo && <img src={teamLogo} alt="" aria-hidden="true" className="hidden" onLoad={() => setLogoImageReady(true)} onError={() => setLogoImageReady(false)} />}
+            </div>
+          </div>
+
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Player IGNs</label>
@@ -95,33 +121,34 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
             </div>
             <div className="grid gap-2.5">
               {players.slice(0, 4).map((player, index) => (
-                <label key={player.slotIndex} className="registration-player-row flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5 transition-colors focus-within:border-indigo-300/35 focus-within:bg-indigo-300/[.035]" style={{ animationDelay: `${index * 55}ms` }}>
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-extrabold ${index === 0 ? 'border border-indigo-300/20 bg-indigo-400/10 text-indigo-200' : 'border border-white/[.06] bg-white/[.04] text-slate-400'}`}>
-                    {String(index + 1).padStart(2, '0')}
+                <label key={player.slotIndex} className="registration-player-row block rounded-2xl border border-white/[.07] bg-white/[.025] p-3 transition-colors focus-within:border-indigo-300/35 focus-within:bg-indigo-300/[.035]" style={{ animationDelay: `${index * 55}ms` }}>
+                  <span className="mb-2 flex items-center gap-2.5">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-extrabold ${index === 0 ? 'border border-indigo-300/20 bg-indigo-400/10 text-indigo-200' : 'border border-white/[.06] bg-white/[.04] text-slate-400'}`}>
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">{index === 0 ? 'Captain · required' : `Player ${index + 1} · required`}</span>
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="mb-1 block text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">{index === 0 ? 'Captain · required' : `Player ${index + 1} · required`}</span>
-                    <input
-                      type="text" required maxLength={40} autoComplete="off" value={player.name}
-                      onChange={(event) => updatePlayer(index, event.target.value)} placeholder="In-game name (IGN)"
-                      disabled={isUnavailable}
-                      className="registration-input w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-slate-600 disabled:opacity-50"
-                    />
-                  </span>
+                  <input
+                    type="text" required maxLength={40} autoComplete="off" value={player.name}
+                    onChange={(event) => updatePlayer(index, event.target.value)} placeholder="In-game name (IGN)"
+                    disabled={isUnavailable}
+                    className="registration-input block h-12 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+                  />
                 </label>
               ))}
             </div>
           </div>
 
           {showBackup ? (
-            <label className="registration-player-row flex items-center gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-300/15 bg-amber-300/[.08] text-[11px] font-extrabold text-amber-200">05</span>
-              <span className="min-w-0 flex-1">
-                <span className="mb-1 block text-[9px] font-bold uppercase tracking-[.13em] text-amber-200/60">Backup · optional</span>
-                <input type="text" maxLength={40} autoComplete="off" value={players[4].name} onChange={(event) => updatePlayer(4, event.target.value)} placeholder="Backup player IGN" disabled={isUnavailable} className="registration-input w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-slate-600 disabled:opacity-50" />
+            <div className="registration-player-row rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-3">
+              <span className="mb-2 flex items-center gap-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-300/15 bg-amber-300/[.08] text-[10px] font-extrabold text-amber-200">05</span>
+                <span className="flex flex-1 items-center justify-between text-[9px] font-bold uppercase tracking-[.13em] text-amber-200/60">Backup · optional
+                  <button type="button" onClick={() => { updatePlayer(4, ''); setShowBackup(false); }} className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-white/[.06] hover:text-white">Remove</button>
+                </span>
               </span>
-              <button type="button" onClick={() => { updatePlayer(4, ''); setShowBackup(false); }} className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-white/[.06] hover:text-white">Remove</button>
-            </label>
+              <input aria-label="Backup player IGN" type="text" maxLength={40} autoComplete="off" value={players[4].name} onChange={(event) => updatePlayer(4, event.target.value)} placeholder="Backup player IGN" disabled={isUnavailable} className="registration-input block h-12 min-w-0 w-full rounded-xl border border-amber-300/10 bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-600 focus:border-amber-300/40 disabled:opacity-50" />
+            </div>
           ) : (
             <button type="button" disabled={isUnavailable} onClick={() => setShowBackup(true)} className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[.13] bg-white/[.015] py-3 text-xs font-semibold text-slate-400 transition hover:border-amber-300/30 hover:bg-amber-300/[.035] hover:text-amber-100 disabled:opacity-40">
               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[.06] transition group-hover:bg-amber-300/10"><Plus size={13} /></span>

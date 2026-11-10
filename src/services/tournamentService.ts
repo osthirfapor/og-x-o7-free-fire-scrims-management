@@ -82,7 +82,7 @@ export function subscribeTeams(
 export async function registerTeam(params: {
   tournament: Tournament;
   teamName: string;
-  teamLogo?: string;
+  teamLogo: string;
   leaderName: string;
   players: Player[]; // 4 main + optional backup
 }): Promise<{ team: Team; registrationId: string }> {
@@ -90,6 +90,13 @@ export async function registerTeam(params: {
 
   // Basic validation
   if (!teamName.trim()) throw new Error('Enter a team name.');
+  if (!teamLogo?.trim()) throw new Error('A team logo image URL is required.');
+  try {
+    const logoUrl = new URL(teamLogo.trim());
+    if (!['http:', 'https:'].includes(logoUrl.protocol)) throw new Error('invalid protocol');
+  } catch {
+    throw new Error('Enter a valid team logo image URL.');
+  }
   if (!leaderName.trim()) throw new Error('Enter the captain in-game name.');
   if (players.length < 4 || players.length > 5) throw new Error('Add four main players and an optional backup.');
 

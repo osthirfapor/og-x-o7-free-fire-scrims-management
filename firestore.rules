@@ -42,6 +42,8 @@ service cloud.firestore {
           && request.resource.data.tournamentId == tournamentId
           && request.resource.data.teamName is string
           && request.resource.data.teamName.size() > 0
+          && request.resource.data.teamLogo is string
+          && request.resource.data.teamLogo.size() > 0
           && request.resource.data.registrationId is string
           && request.resource.data.players is list
           && request.resource.data.players.size() >= 4
