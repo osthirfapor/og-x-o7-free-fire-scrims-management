@@ -520,9 +520,9 @@ function MainApp() {
           </div>
 
           {/* Profile menu */}
-          <div className="relative">
-            <button type="button" onClick={() => setShowWallet(true)} className="mr-1 rounded-xl border border-amber-300/20 bg-amber-300/[.07] px-3 py-2 text-xs font-extrabold tabular-nums text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/[.12]" title="Open team wallet">৳{walletBalance.toLocaleString()}</button>
-            <button type="button" aria-haspopup="menu" aria-expanded={showProfileMenu} onClick={() => setShowProfileMenu((open) => !open)} className="profile-trigger flex max-w-[min(58vw,280px)] items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] p-1.5 pr-2.5 text-xs transition hover:border-indigo-300/25 hover:bg-white/[.06]">
+          <div className="relative flex shrink-0 items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => setShowWallet(true)} className="inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-amber-300/20 bg-amber-300/[.07] px-3 py-2 text-xs font-extrabold tabular-nums text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/[.12]" title="Open team wallet">৳{walletBalance.toLocaleString()}</button>
+            <button type="button" aria-haspopup="menu" aria-expanded={showProfileMenu} onClick={() => setShowProfileMenu((open) => !open)} className="profile-trigger flex min-h-12 max-w-[min(58vw,280px)] shrink items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] p-1.5 pr-2.5 text-xs transition hover:border-indigo-300/25 hover:bg-white/[.06]">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-300/25 bg-indigo-500/15">{teamProfile.teamLogo ? <img src={teamProfile.teamLogo} alt={`${teamProfile.teamName} logo`} className="h-full w-full object-cover" /> : <Gamepad2 size={15} className="text-indigo-200" />}</span>
               <span className="min-w-0 text-left"><span className="block truncate font-bold text-slate-100">{teamProfile.teamName}</span><span className="block text-[10px] text-slate-500">Profile</span></span>
               <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
