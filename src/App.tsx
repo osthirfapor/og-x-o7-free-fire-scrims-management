@@ -25,6 +25,9 @@ import {
   LogOut,
   Wallet,
   X as CloseIcon,
+  ChevronDown,
+  CalendarDays,
+  CheckCircle2,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -36,12 +39,14 @@ import {
   getLocalTeamProfile,
   findRegisteredTeamProfile,
   saveTeamProfile,
+  subscribeTeamWallet,
 } from './services/tournamentService';
 import { LeaderboardView } from './components/LeaderboardView';
 import { testConnection } from './lib/firebase';
 import { RegistrationModal } from './components/RegistrationModal';
 import { RegistrationSuccessModal } from './components/RegistrationSuccessModal';
 import { TeamLoginGate } from './components/TeamLoginGate';
+import { TeamAccountRegistrationModal } from './components/TeamAccountRegistrationModal';
 import { PlayerSearchView } from './components/PlayerSearchView';
 import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
@@ -65,7 +70,7 @@ function MainApp() {
   const { isAdmin } = useAuth();
 
   // Navigation Views: 'tournaments' | 'leaderboard' | 'player_search' (+ 'registered_teams' opened from a tournament card)
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'leaderboard' | 'registered_teams' | 'player_search'>('tournaments');
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'my_tournaments' | 'leaderboard' | 'registered_teams' | 'player_search'>('tournaments');
   const [categoryFilter, setCategoryFilter] = useState<'all' | TournamentCategory>('all');
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -87,11 +92,15 @@ function MainApp() {
   // Captain / Team Profile State (for 1-click Auto-Refill)
   const [teamProfile, setTeamProfile] = useState<TeamProfile | null>(() => getLocalTeamProfile());
   const [checkingTeamSession, setCheckingTeamSession] = useState(() => Boolean(getLocalTeamProfile()));
+  const [walletBalance, setWalletBalance] = useState(0);
 
   // Modals
   const [showRegModal, setShowRegModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showTeamAccountRegistration, setShowTeamAccountRegistration] = useState(false);
+  const [teamAccountSubmitted, setTeamAccountSubmitted] = useState<string | null>(null);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
   const [isAdminPage, setIsAdminPage] = useState(() => ADMIN_PANEL_ENABLED && new URLSearchParams(window.location.search).get('panel') === 'admin');
   const handledRegistrationLink = useRef(false);
@@ -144,22 +153,30 @@ function MainApp() {
   // Registration links select the right tournament and open its form directly.
   // A saved squad can still use this link; the form will prefill its local profile.
   useEffect(() => {
-    if (handledRegistrationLink.current || isAdminPage || PUBLIC_READ_ONLY || !tournaments.length) return;
+    if (handledRegistrationLink.current || isAdminPage || PUBLIC_READ_ONLY || !tournaments.length || checkingTeamSession) return;
     const requestedId = new URLSearchParams(window.location.search).get('register');
     if (!requestedId) return;
     const requestedTournament = tournaments.find((tournament) => tournament.id === requestedId);
     if (!requestedTournament) return;
     handledRegistrationLink.current = true;
     setActiveTournament(requestedTournament);
-    setShowRegModal(requestedTournament.status === 'open' && requestedTournament.registeredCount < requestedTournament.maxTeams);
+    // A direct link should land new visitors at login. Only an approved, logged-in
+    // squad is taken straight into tournament registration.
+    setShowRegModal(Boolean(teamProfile) && requestedTournament.status === 'open' && requestedTournament.registeredCount < requestedTournament.maxTeams);
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('register');
     window.history.replaceState({}, '', cleanUrl.toString());
-  }, [tournaments, isAdminPage]);
+  }, [tournaments, isAdminPage, checkingTeamSession, teamProfile, walletBalance]);
 
   const handleOpenRegistration = (tour?: Tournament) => {
     const target = tour || activeTournament;
     if (!target || target.status !== 'open' || target.registeredCount >= target.maxTeams) return;
+    if (myRegistrations.some((registration) => registration.tournament.id === target.id)) return;
+    const fee = target.category === 'paid' ? Number(target.entryFeeAmount ?? target.entryFee ?? 0) : 0;
+    if (fee > walletBalance) {
+      alert(`Insufficient wallet balance. This tournament needs ৳${fee}; your balance is ৳${walletBalance}. Ask the organizer to add funds.`);
+      return;
+    }
     if (tour) setActiveTournament(tour);
     setShowRegModal(true);
   };
@@ -215,6 +232,14 @@ function MainApp() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (!teamProfile) {
+      setWalletBalance(0);
+      return;
+    }
+    return subscribeTeamWallet(teamProfile.teamName, (wallet) => setWalletBalance(Number(wallet?.balance) || 0));
+  }, [teamProfile?.teamName]);
+
   // Subscribe to every tournament so search and player totals use full history.
   const tournamentIds = tournaments.map((tournament) => tournament.id).sort().join('|');
   useEffect(() => {
@@ -236,7 +261,7 @@ function MainApp() {
   const filteredTournaments = useMemo(() => {
     return tournaments.filter((t) => {
       const hasAvailableSlots = t.registeredCount < t.maxTeams;
-      return hasAvailableSlots && (categoryFilter === 'all' || (t.category || 'practice') === categoryFilter);
+      return t.status !== 'completed' && hasAvailableSlots && (categoryFilter === 'all' || (t.category || 'practice') === categoryFilter);
     });
   }, [tournaments, categoryFilter]);
 
@@ -247,6 +272,15 @@ function MainApp() {
     .filter((result) => result.teamName.trim().toLocaleLowerCase() === teamProfile?.teamName.trim().toLocaleLowerCase() && Number(result.earnings) > 0)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [publishedResults, teamProfile?.teamName]);
   const walletTotal = walletEntries.reduce((sum, result) => sum + (Number(result.earnings) || 0), 0);
+  const myRegistrations = useMemo(() => {
+    if (!teamProfile) return [];
+    return allTeams
+      .filter((team) => team.teamName.trim().toLocaleLowerCase() === teamProfile.teamName.trim().toLocaleLowerCase()
+        && team.leaderName.trim().toLocaleLowerCase() === teamProfile.leaderName.trim().toLocaleLowerCase())
+      .map((team) => ({ team, tournament: tournaments.find((tournament) => tournament.id === team.tournamentId) }))
+      .filter((item): item is { team: Team; tournament: Tournament } => Boolean(item.tournament))
+      .sort((a, b) => new Date(b.team.createdAt).getTime() - new Date(a.team.createdAt).getTime());
+  }, [allTeams, teamProfile?.teamName, teamProfile?.leaderName, tournaments]);
   const myStanding = useMemo(() => {
     if (!teamProfile) return null;
     const idx = leaderboard.findIndex(
@@ -322,11 +356,22 @@ function MainApp() {
           onLoginSuccess={(profile) => {
           setShowSuccessModal(false);
           setRegisteredSuccessTeam(null);
+            setTeamAccountSubmitted(null);
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}
-          onRegister={activeTournament?.status === 'open' && activeTournament.registeredCount < activeTournament.maxTeams ? () => setShowRegModal(true) : undefined}
+          onRegister={() => { setTeamAccountSubmitted(null); setShowTeamAccountRegistration(true); }}
+          registrationSubmitted={teamAccountSubmitted}
         />
+        {showTeamAccountRegistration && (
+          <TeamAccountRegistrationModal
+            onClose={() => setShowTeamAccountRegistration(false)}
+            onSuccess={(account) => {
+              setShowTeamAccountRegistration(false);
+              setTeamAccountSubmitted(account.teamName);
+            }}
+          />
+        )}
         {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (
           <RegistrationModal
             tournament={activeTournament}
@@ -399,8 +444,9 @@ function MainApp() {
             <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Menu</div>
             {[
               { key: 'tournaments', label: 'Tournaments', icon: <Flame size={17} />, tint: 'text-indigo-400' },
+              { key: 'my_tournaments', label: 'My Tournaments', icon: <CalendarDays size={17} />, tint: 'text-cyan-300' },
               { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy size={17} />, tint: 'text-amber-400' },
-              { key: 'player_search', label: 'Teams & Players', icon: <Search size={17} />, tint: 'text-emerald-400' },
+              { key: 'player_search', label: 'All Teams', icon: <Search size={17} />, tint: 'text-emerald-400' },
             ].map((item) => {
               const active = activeTab === item.key || (item.key === 'tournaments' && activeTab === 'registered_teams');
               return (
@@ -473,25 +519,22 @@ function MainApp() {
             </div>
           </div>
 
-          {/* Signed-in squad status */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] px-2 py-1.5 text-xs">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-300/25 bg-indigo-500/15">
-                {teamProfile.teamLogo ? <img src={teamProfile.teamLogo} alt={`${teamProfile.teamName} logo`} className="h-full w-full object-cover" /> : <Gamepad2 size={15} className="text-indigo-200" />}
-              </span>
-              <span className="max-w-[160px] truncate font-semibold text-slate-200">{teamProfile.teamName}</span>
-            </div>
-            <button type="button" onClick={() => setShowWallet(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/15 bg-amber-300/[.06] px-3 py-2 text-xs font-bold text-amber-100 transition hover:border-amber-300/35 hover:bg-amber-300/10" title="View tournament prize earnings">
-              <Wallet size={15} /> <span className="hidden sm:inline">Wallet</span>
+          {/* Profile menu */}
+          <div className="relative">
+            <button type="button" onClick={() => setShowWallet(true)} className="mr-1 rounded-xl border border-amber-300/20 bg-amber-300/[.07] px-3 py-2 text-xs font-extrabold tabular-nums text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/[.12]" title="Open team wallet">৳{walletBalance.toLocaleString()}</button>
+            <button type="button" aria-haspopup="menu" aria-expanded={showProfileMenu} onClick={() => setShowProfileMenu((open) => !open)} className="profile-trigger flex max-w-[min(58vw,280px)] items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] p-1.5 pr-2.5 text-xs transition hover:border-indigo-300/25 hover:bg-white/[.06]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-300/25 bg-indigo-500/15">{teamProfile.teamLogo ? <img src={teamProfile.teamLogo} alt={`${teamProfile.teamName} logo`} className="h-full w-full object-cover" /> : <Gamepad2 size={15} className="text-indigo-200" />}</span>
+              <span className="min-w-0 text-left"><span className="block truncate font-bold text-slate-100">{teamProfile.teamName}</span><span className="block text-[10px] text-slate-500">Profile</span></span>
+              <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
             </button>
-            <button
-              onClick={handleLogoutTeam}
-              className="rounded-xl border border-white/5 p-2 text-slate-400 transition-all hover:border-rose-400/20 hover:bg-rose-400/10 hover:text-rose-300"
-              title="Log out"
-              aria-label="Log out"
-            >
-              <LogOut size={16} />
-            </button>
+            {showProfileMenu && <>
+              <button type="button" aria-label="Close profile menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setShowProfileMenu(false)} />
+              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#141720] p-2 shadow-2xl shadow-black/50 animate-fade-in">
+                <div className="border-b border-white/[.07] px-3 py-2.5"><div className="truncate text-xs font-extrabold text-white">{teamProfile.teamName}</div><div className="mt-1 truncate text-[10px] text-slate-500">Captain · {teamProfile.leaderName}</div></div>
+                <button role="menuitem" type="button" onClick={() => { setShowProfileMenu(false); setShowWallet(true); }} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-amber-100 transition hover:bg-amber-300/[.08]">Wallet balance <span className="ml-auto text-[10px] text-amber-200/70">৳{walletBalance.toLocaleString()}</span></button>
+                <button role="menuitem" type="button" onClick={() => { setShowProfileMenu(false); handleLogoutTeam(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-200 transition hover:bg-rose-300/[.08]"><LogOut size={15} /> Log out</button>
+              </div>
+            </>}
           </div>
         </header>
 
@@ -505,12 +548,12 @@ function MainApp() {
               <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Tournament arena'
-                  : activeTab === 'leaderboard' ? 'Hall of champions' : 'Squad roster'}
+                  : activeTab === 'my_tournaments' ? 'My Tournaments' : activeTab === 'leaderboard' ? 'Hall of champions' : 'Squad roster'}
               </h1>
               <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Find your next Free Fire scrim and secure your squad’s place.'
-                  : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Open any squad to see its players and how many matches each has played.'}
+                  : activeTab === 'my_tournaments' ? 'Your squad’s registrations. Select a tournament to view its registered teams.' : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Open any squad to see its players and how many matches each has played.'}
               </p>
             </div>
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
@@ -578,6 +621,8 @@ function MainApp() {
                       const isSelected = activeTournament?.id === tour.id;
                       const isFull = tour.registeredCount >= tour.maxTeams;
                       const isOpen = tour.status === 'open';
+                      const isRegistered = myRegistrations.some((registration) => registration.tournament.id === tour.id);
+                      const entryFee = tour.category === 'paid' ? Number(tour.entryFeeAmount ?? tour.entryFee ?? 0) : 0;
                       const remainingSlots = Math.max(0, tour.maxTeams - tour.registeredCount);
 
                       // Background artwork selection
@@ -657,7 +702,15 @@ function MainApp() {
                             </h4>
 
                             <div className="mt-2 flex items-center justify-center">
-                              {isOpen && !isFull && !PUBLIC_READ_ONLY ? (
+                              {isRegistered ? (
+                                <button disabled onClick={(e) => e.stopPropagation()} className="w-full py-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[.06] text-cyan-100 font-bold text-[10px] sm:text-xs cursor-default">
+                                  ✓ Already Registered
+                                </button>
+                              ) : isOpen && !isFull && !PUBLIC_READ_ONLY && entryFee > walletBalance ? (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); setShowWallet(true); }} className="w-full py-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[.07] text-amber-100 font-bold text-[10px] sm:text-xs">
+                                  Need ৳{entryFee} · Wallet ৳{walletBalance}
+                                </button>
+                              ) : isOpen && !isFull && !PUBLIC_READ_ONLY ? (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -777,6 +830,15 @@ function MainApp() {
           )}
 
           {/* TAB 2: LEADERBOARD */}
+          {activeTab === 'my_tournaments' && (
+            <section className="space-y-4">
+              <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
+              {myRegistrations.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><CalendarDays size={26} className="mx-auto text-slate-600" /><h3 className="mt-3 text-sm font-bold text-white">No registrations yet</h3><p className="mt-1 text-xs text-slate-500">When your squad registers, tournaments will appear here.</p><button type="button" onClick={() => setActiveTab('tournaments')} className="mt-4 rounded-xl bg-indigo-500/15 px-4 py-2 text-xs font-bold text-indigo-200">Explore open tournaments</button></div> : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span><span>{tournament.map || 'Bermuda'}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
+              )}
+            </section>
+          )}
+
           {activeTab === 'leaderboard' && (
             <LeaderboardView results={publishedResults} tournaments={tournaments} />
           )}
@@ -786,7 +848,7 @@ function MainApp() {
             <RegisteredTeamsView
               teams={currentTeams}
               tournament={activeTournament}
-              onRegisterClick={PUBLIC_READ_ONLY ? undefined : () => handleOpenRegistration(activeTournament || undefined)}
+              onRegisterClick={PUBLIC_READ_ONLY || myRegistrations.some((registration) => registration.tournament.id === activeTournament.id) ? undefined : () => handleOpenRegistration(activeTournament || undefined)}
             />
           )}
 
@@ -811,9 +873,10 @@ function MainApp() {
             </header>
             <div className="p-5">
               <div className="rounded-2xl border border-amber-300/15 bg-gradient-to-br from-amber-300/[.1] to-orange-500/[.03] p-5">
-                <div className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-100/60">Total prize earnings</div>
-                <div className="mt-2 text-3xl font-black text-amber-100">৳{walletTotal.toLocaleString()}</div>
-                <div className="mt-1 text-[10px] text-slate-500">This is a record of results, not a withdrawable balance.</div>
+                <div className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-100/60">Available balance</div>
+                <div className="mt-2 text-3xl font-black text-amber-100">৳{walletBalance.toLocaleString()}</div>
+                <div className="mt-1 text-[10px] text-slate-500">Paid scrim fees are deducted automatically when your team registers.</div>
+                {walletTotal > 0 && <div className="mt-3 border-t border-amber-200/10 pt-2 text-[11px] text-amber-100/70">Prize earnings recorded: ৳{walletTotal.toLocaleString()}</div>}
               </div>
               <div className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400">Recent earnings</div>
               <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
@@ -828,6 +891,7 @@ function MainApp() {
       {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (
         <RegistrationModal
           tournament={activeTournament}
+          walletBalance={walletBalance}
           onSuccess={handleRegisterSuccess}
           onClose={() => setShowRegModal(false)}
         />

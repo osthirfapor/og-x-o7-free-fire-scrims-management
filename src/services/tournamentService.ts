@@ -8,10 +8,12 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
+  writeBatch,
   runTransaction,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Tournament, Team, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
+import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
 export function generateRegistrationId(): string {
@@ -27,9 +29,101 @@ function teamBanDocId(teamName: string): string {
   return encodeURIComponent(teamName.trim().toLocaleLowerCase().replace(/\s+/g, ' '));
 }
 
+export function teamWalletDocId(teamName: string): string {
+  return encodeURIComponent(teamName.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' '));
+}
+
+export function subscribeTeamWallet(teamName: string, onData: (wallet: TeamWallet | null) => void, onError?: (error: unknown) => void) {
+  const walletId = teamWalletDocId(teamName);
+  return onSnapshot(doc(db, 'team_wallets', walletId), (snapshot) => {
+    onData(snapshot.exists() ? { id: snapshot.id, ...(snapshot.data() as Omit<TeamWallet, 'id'>) } : null);
+  }, (error) => {
+    onError?.(error);
+    handleFirestoreError(error, OperationType.GET, `team_wallets/${walletId}`);
+  });
+}
+
+export function subscribeTeamWallets(onData: (wallets: TeamWallet[]) => void, onError?: (error: unknown) => void) {
+  return onSnapshot(collection(db, 'team_wallets'), (snapshot) => {
+    const wallets = snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<TeamWallet, 'id'>) }));
+    wallets.sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
+    onData(wallets);
+  }, (error) => {
+    onError?.(error);
+    handleFirestoreError(error, OperationType.GET, 'team_wallets');
+  });
+}
+
+export async function creditTeamWallet(teamNameInput: string, amountInput: number): Promise<TeamWallet> {
+  const teamName = teamNameInput.trim();
+  const amount = Math.round(Number(amountInput) * 100) / 100;
+  if (!teamName) throw new Error('Enter a team name.');
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter an amount greater than zero.');
+  const ref = doc(db, 'team_wallets', teamWalletDocId(teamName));
+  const now = new Date().toISOString();
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.exists() ? snapshot.data() as TeamWallet : null;
+    const canonicalName = data?.teamName || teamName;
+    const wallet: TeamWallet = {
+      id: ref.id,
+      teamName: canonicalName,
+      balance: Math.round(((data?.balance || 0) + amount) * 100) / 100,
+      createdAt: data?.createdAt || now,
+      updatedAt: now,
+    };
+    transaction.set(ref, wallet);
+    return wallet;
+  });
+}
+
 export async function isTeamNameBanned(teamName: string): Promise<boolean> {
   const snapshot = await getDoc(doc(db, 'banned_teams', teamBanDocId(teamName)));
   return snapshot.exists() && snapshot.data().enabled === true;
+}
+
+export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; players: Player[] }): Promise<TeamAccount> {
+  const teamName = params.teamName.trim();
+  const leaderName = params.leaderName.trim();
+  if (!teamName || !leaderName || !params.teamLogo.trim()) throw new Error('Complete your team name, captain IGN, and logo.');
+  if (params.players.length < 4 || params.players.length > 5 || params.players.slice(0, 4).some((player) => !player.name.trim())) throw new Error('Add all four main players.');
+  if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registration. Contact the organizer.');
+  const normalizedTeam = teamName.toLocaleLowerCase();
+  const normalizedLeader = leaderName.toLocaleLowerCase();
+  const existing = await getDocs(collection(db, 'team_accounts'));
+  if (existing.docs.some((item) => {
+    const account = item.data() as TeamAccount;
+    return account.teamName.trim().toLocaleLowerCase() === normalizedTeam && account.leaderName.trim().toLocaleLowerCase() === normalizedLeader && account.status !== 'rejected';
+  })) throw new Error('An account request already exists for this team and captain.');
+  const id = `account_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+  const account: TeamAccount = {
+    id,
+    teamName,
+    teamLogo: params.teamLogo,
+    leaderName,
+    players: params.players.map((player) => ({ ...player, name: player.name.trim() })),
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await setDoc(doc(db, 'team_accounts', id), account);
+  return account;
+}
+
+export function subscribeTeamAccounts(onData: (accounts: TeamAccount[]) => void, onError?: (error: unknown) => void) {
+  return onSnapshot(collection(db, 'team_accounts'), (snapshot) => {
+    const accounts = snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<TeamAccount, 'id'>) }));
+    accounts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    onData(accounts);
+  }, (error) => {
+    onError?.(error);
+    handleFirestoreError(error, OperationType.GET, 'team_accounts');
+  });
+}
+
+export async function updateTeamAccountStatus(accountId: string, status: TeamAccount['status']): Promise<void> {
+  await updateDoc(doc(db, 'team_accounts', accountId), { status, updatedAt: new Date().toISOString() });
 }
 
 export async function setTeamBanned(teamName: string, enabled: boolean): Promise<void> {
@@ -146,8 +240,12 @@ export async function registerTeam(params: {
   const teamsColRef = collection(db, 'tournaments', tournament.id, 'teams');
 
   const registrationId = generateRegistrationId();
-  const teamDocId = `team_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  // One team may claim only one slot per tournament. A stable, normalized
+  // team key makes concurrent submissions collide on the same Firestore doc.
+  const teamDocId = `team_${encodeURIComponent(teamName.trim().normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' '))}`;
   const teamRef = doc(teamsColRef, teamDocId);
+  const walletKey = teamWalletDocId(teamName);
+  const walletRef = doc(db, 'team_wallets', walletKey);
 
   const cleanPlayerNames = players.map((p) => p.name.trim());
 
@@ -159,6 +257,22 @@ export async function registerTeam(params: {
     }
 
     const tourData = tourSnap.data() as Tournament;
+
+    const existingTeamSnap = await transaction.get(teamRef);
+    if (existingTeamSnap.exists()) throw new Error('Your team is already registered in this tournament.');
+
+    const paidTournament = (tourData.category || 'practice') === 'paid';
+    const requiredFee = Number(tourData.entryFeeAmount ?? tourData.entryFee ?? 0);
+    let walletData: TeamWallet | null = null;
+    if (paidTournament) {
+      if (!(requiredFee > 0)) throw new Error('The paid tournament has no valid entry fee configured. Contact the organizer.');
+      const walletSnapshot = await transaction.get(walletRef);
+      if (walletSnapshot.exists()) walletData = { id: walletSnapshot.id, ...(walletSnapshot.data() as Omit<TeamWallet, 'id'>) };
+      if (!walletData || walletData.balance < requiredFee) {
+        throw new Error(`Insufficient wallet balance. This tournament needs ৳${requiredFee}; contact the organizer to add funds.`);
+      }
+      if (walletData.teamName !== teamName.trim()) throw new Error(`Use the registered team name exactly as shown in your profile to use its wallet.`);
+    }
 
     if (tourData.status !== 'open') {
       throw new Error('Registration is closed.');
@@ -174,6 +288,9 @@ export async function registerTeam(params: {
 
     existingTeamsSnap.forEach((d) => {
       const t = d.data() as Team;
+      if (t.teamName.trim().normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ') === teamName.trim().normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ')) {
+        throw new Error('Your team is already registered in this tournament.');
+      }
       if (t.playerNames && Array.isArray(t.playerNames)) {
         t.playerNames.forEach((n) => registeredNamesSet.add(n.trim().toLowerCase()));
       } else if (t.players && Array.isArray(t.players)) {
@@ -193,6 +310,7 @@ export async function registerTeam(params: {
     const newTeamData: Team = {
       id: teamDocId,
       tournamentId: tournament.id,
+      walletKey,
       registrationId,
       teamName: teamName.trim(),
       teamLogo: teamLogo?.trim() || '',
@@ -220,6 +338,16 @@ export async function registerTeam(params: {
       status: shouldClose ? 'closed' : tourData.status,
       updatedAt: nowIso,
     });
+
+    if (paidTournament && walletData) {
+      transaction.update(walletRef, {
+        balance: Math.round((walletData.balance - requiredFee) * 100) / 100,
+        updatedAt: nowIso,
+        lastDebit: requiredFee,
+        lastTournamentId: tournament.id,
+        lastTeamId: teamDocId,
+      });
+    }
 
     return {
       newTeam: newTeamData,
@@ -302,6 +430,7 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     redirectButtonText: data.redirectButtonText || 'Join WhatsApp / Discord Group',
     map: data.map || 'Bermuda',
     entryFee: data.entryFee || '',
+    entryFeeAmount: Number(data.entryFeeAmount ?? data.entryFee ?? 0) || 0,
     prizePool: data.prizePool || '',
     bannerUrl: data.bannerUrl || '',
     cardImageUrl: data.cardImageUrl || '',
@@ -333,7 +462,22 @@ export async function updateTournament(tournamentId: string, updates: Partial<To
 // 6. Admin: Delete Tournament
 export async function deleteTournament(tournamentId: string) {
   try {
-    await deleteDoc(doc(db, 'tournaments', tournamentId));
+    const [teamsSnapshot, resultsSnapshot, logsSnapshot] = await Promise.all([
+      getDocs(collection(db, 'tournaments', tournamentId, 'teams')),
+      getDocs(query(collection(db, 'match_results'), where('tournamentId', '==', tournamentId))),
+      getDocs(query(collection(db, 'registration_logs'), where('tournamentId', '==', tournamentId))),
+    ]);
+    const refs = [
+      ...teamsSnapshot.docs.map((item) => item.ref),
+      ...resultsSnapshot.docs.map((item) => item.ref),
+      ...logsSnapshot.docs.map((item) => item.ref),
+      doc(db, 'tournaments', tournamentId),
+    ];
+    for (let offset = 0; offset < refs.length; offset += 450) {
+      const batch = writeBatch(db);
+      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `tournaments/${tournamentId}`);
   }
@@ -539,6 +683,23 @@ export async function saveTeamProfile(profile: TeamProfile): Promise<void> {
 export async function findRegisteredTeamProfile(teamName: string, leaderName: string): Promise<TeamProfile | null> {
   const normalizedTeam = teamName.trim().toLocaleLowerCase();
   const normalizedLeader = leaderName.trim().toLocaleLowerCase();
+  if (await isTeamNameBanned(teamName)) return null;
+  const accountSnapshot = await getDocs(collection(db, 'team_accounts'));
+  const approvedAccount = accountSnapshot.docs
+    .map((item) => ({ id: item.id, ...(item.data() as Omit<TeamAccount, 'id'>) }))
+    .find((account) => account.status === 'approved'
+      && account.teamName.trim().toLocaleLowerCase() === normalizedTeam
+      && account.leaderName.trim().toLocaleLowerCase() === normalizedLeader);
+  if (approvedAccount) {
+    return {
+      userId: approvedAccount.id,
+      teamName: approvedAccount.teamName,
+      teamLogo: approvedAccount.teamLogo,
+      leaderName: approvedAccount.leaderName,
+      players: approvedAccount.players,
+      updatedAt: approvedAccount.updatedAt,
+    };
+  }
   const tournamentSnapshot = await getDocs(collection(db, 'tournaments'));
   const tournamentTeamSnapshots = await Promise.all(
     tournamentSnapshot.docs.map((tournamentDoc) => getDocs(collection(db, 'tournaments', tournamentDoc.id, 'teams')))
@@ -557,7 +718,6 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
   }
 
   if (!registered) return null;
-  if (await isTeamNameBanned(registered.teamName)) return null;
   return {
     userId: `${registered.tournamentId}_${registered.id}`,
     registrationId: registered.registrationId,

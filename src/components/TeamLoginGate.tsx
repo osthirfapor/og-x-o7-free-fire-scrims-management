@@ -7,9 +7,10 @@ interface Props {
   onLoginSuccess: (profile: TeamProfile) => void;
   onOpenAdminSecret?: () => void;
   onRegister?: () => void;
+  registrationSubmitted?: string | null;
 }
 
-export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister }) => {
+export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister, registrationSubmitted }) => {
   const existing = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(existing?.teamName || '');
   const [leaderName, setLeaderName] = useState(existing?.leaderName || '');
@@ -97,6 +98,8 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
             <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Welcome back, Captain</h2>
             <p className="mt-2 text-xs leading-5 text-slate-400">Enter your registered team details.</p>
           </div>
+
+          {registrationSubmitted && <div className="mb-4 rounded-xl border border-emerald-300/20 bg-emerald-300/[.06] px-3.5 py-3 text-xs leading-5 text-emerald-100"><strong>{registrationSubmitted}</strong> sent for review. Login will work after organizer approval.</div>}
 
           {error && (
             <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-xs leading-5 text-rose-200">

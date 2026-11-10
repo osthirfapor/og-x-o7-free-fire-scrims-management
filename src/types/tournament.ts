@@ -16,9 +16,32 @@ export interface TeamProfile {
   updatedAt: string;
 }
 
+export interface TeamAccount {
+  id: string;
+  teamName: string;
+  teamLogo: string;
+  leaderName: string;
+  players: Player[];
+  status: 'pending' | 'approved' | 'rejected' | 'banned';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamWallet {
+  id: string;
+  teamName: string;
+  balance: number;
+  createdAt: string;
+  updatedAt: string;
+  lastDebit?: number;
+  lastTournamentId?: string;
+  lastTeamId?: string;
+}
+
 export interface Team {
   id: string;
   tournamentId: string;
+  walletKey?: string;
   registrationId: string;
   teamName: string;
   teamLogo?: string;
@@ -45,6 +68,7 @@ export interface Tournament {
   redirectButtonText: string;
   map?: string;
   entryFee?: string;
+  entryFeeAmount?: number;
   prizePool?: string;
   bannerUrl?: string;
   cardImageUrl?: string;

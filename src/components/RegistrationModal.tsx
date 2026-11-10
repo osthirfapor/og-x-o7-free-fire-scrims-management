@@ -7,9 +7,10 @@ interface Props {
   tournament: Tournament;
   onSuccess: (team: Team, tournament: Tournament) => void;
   onClose: () => void;
+  walletBalance?: number;
 }
 
-export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose }) => {
+export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose, walletBalance }) => {
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
@@ -134,7 +135,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
         <form onSubmit={handleSubmit} className="relative space-y-5 px-5 py-5 sm:px-7 sm:py-6">
           <div className="space-y-2">
             <label htmlFor="registration-team-name" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team name</label>
-            {tournament.category === 'paid' && tournament.entryFee && <div className="rounded-xl border border-amber-300/15 bg-amber-300/[.05] px-3 py-2 text-xs font-semibold text-amber-100">Entry fee: ৳{Number(tournament.entryFee).toLocaleString()} per team</div>}
+            {tournament.category === 'paid' && tournament.entryFee && <div className="rounded-xl border border-amber-300/15 bg-amber-300/[.05] px-3 py-2 text-xs font-semibold text-amber-100">Entry fee: ৳{Number(tournament.entryFeeAmount ?? tournament.entryFee).toLocaleString()} per team{walletBalance !== undefined && <span className="ml-2 text-amber-100/70">· Wallet: ৳{walletBalance.toLocaleString()}</span>}</div>}
             <input
               id="registration-team-name" autoComplete="organization" required maxLength={50} value={teamName}
               onChange={(event) => setTeamName(event.target.value)} placeholder="Enter your team name"

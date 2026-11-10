@@ -26,9 +26,13 @@ import {
   LayoutDashboard,
   History as HistoryIcon,
   CalendarDays,
+  MoreVertical,
+  Gamepad2,
+  Wallet,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Tournament, Team, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
+import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
 import { RegistrationModal } from './RegistrationModal';
 import {
   createTournament,
@@ -46,6 +50,10 @@ import {
   calcPoints,
   buildLeaderboard,
   publishTournamentResults,
+  subscribeTeamAccounts,
+  updateTeamAccountStatus,
+  creditTeamWallet,
+  subscribeTeamWallets,
 } from '../services/tournamentService';
 
 interface Props {
@@ -76,7 +84,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'scrims' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'accounts' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -100,6 +108,9 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // New Tournament Modal State
   const [showCreateTour, setShowCreateTour] = useState(false);
+  const [openScrimMenu, setOpenScrimMenu] = useState<string | null>(null);
+  const [openOverviewMenu, setOpenOverviewMenu] = useState(false);
+  const [openOverviewTourMenu, setOpenOverviewTourMenu] = useState<string | null>(null);
   const [newlyCreatedRegistrationLink, setNewlyCreatedRegistrationLink] = useState('');
   const [copiedRegistrationLink, setCopiedRegistrationLink] = useState<string | null>(null);
   const [newTourName, setNewTourName] = useState('');
@@ -127,6 +138,12 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
+  const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
+  const [teamWallets, setTeamWallets] = useState<TeamWallet[]>([]);
+  const [walletSearch, setWalletSearch] = useState('');
+  const [walletTeamName, setWalletTeamName] = useState('');
+  const [walletCreditAmount, setWalletCreditAmount] = useState('');
+  const [walletCreditMessage, setWalletCreditMessage] = useState<string | null>(null);
 
   // Search Filter in Teams tab
   const [teamSearch, setTeamSearch] = useState('');
@@ -161,6 +178,8 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (!isAdmin) {
       setLogs([]);
       setActivityLogs([]);
+      setTeamAccounts([]);
+      setTeamWallets([]);
       setResults([]);
       return;
     }
@@ -178,10 +197,14 @@ export const AdminPanelModal: React.FC<Props> = ({
       setLogs(fetchedLogs);
     });
     const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
+    const unsubAccounts = subscribeTeamAccounts((items) => setTeamAccounts(items));
+    const unsubWallets = subscribeTeamWallets((items) => setTeamWallets(items));
     const unsubResults = subscribeMatchResults((r) => setResults(r));
     return () => {
       unsubLogs();
       unsubActivity();
+      unsubAccounts();
+      unsubWallets();
       unsubResults();
     };
   }, [isAdmin]);
@@ -263,6 +286,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         time: tourTime,
         maxTeams: Number(tourMaxTeams),
         entryFee: currentTour.category === 'paid' ? tourEntryFee.trim() : '',
+        entryFeeAmount: currentTour.category === 'paid' ? Number(tourEntryFee) || 0 : 0,
         status: tourStatus,
         map: tourMap,
         cardImageUrl: tourCardImage.trim(),
@@ -318,6 +342,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         name: newTourName.trim(),
         category: newTourCategory,
         entryFee: newTourCategory === 'paid' ? newTourEntryFee.trim() : '',
+        entryFeeAmount: newTourCategory === 'paid' ? Number(newTourEntryFee) || 0 : 0,
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
         maxTeams: Number(newTourMax) || 12,
@@ -354,6 +379,19 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
+  const handleCompleteTournament = async (tour: Tournament) => {
+    if (!confirm(`Complete ${tour.name}? Draft results will be published and moved to Match History.`)) return;
+    try {
+      const publishedCount = await publishTournamentResults(tour.id);
+      await updateTournament(tour.id, { status: 'completed' });
+      if (currentTour.id === tour.id) setTourStatus('completed');
+      void writeAdminActivityLog({ eventType: 'tournament_completed', summary: `Completed ${tour.name}; published ${publishedCount} draft result(s).`, tournamentId: tour.id, tournamentName: tour.name }).catch((error) => console.warn('Could not save admin activity log:', error));
+      setOpenScrimMenu(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not complete tournament.');
+    }
+  };
+
   // Team Actions: Approve / Reject
   const handleTeamStatus = async (team: Team, nextStatus: 'approved' | 'rejected' | 'pending' | 'banned') => {
     try {
@@ -364,6 +402,31 @@ export const AdminPanelModal: React.FC<Props> = ({
     } catch (err: any) {
       if (nextStatus === 'banned') await setTeamBanned(team.teamName, false).catch(() => undefined);
       alert(`Failed to update team: ${err.message}`);
+    }
+  };
+
+  const handleTeamAccountStatus = async (account: TeamAccount, status: TeamAccount['status']) => {
+    try {
+      if (status === 'banned') await setTeamBanned(account.teamName, true);
+      if (account.status === 'banned' && status !== 'banned') await setTeamBanned(account.teamName, false);
+      await updateTeamAccountStatus(account.id, status);
+      void writeAdminActivityLog({ eventType: status === 'banned' ? 'team_banned' : status === 'approved' ? 'team_account_approved' : status === 'rejected' ? 'team_account_rejected' : 'team_unbanned', summary: `${account.teamName} account request marked ${status}.`, teamName: account.teamName }).catch((error) => console.warn('Could not save admin activity log:', error));
+    } catch (error) {
+      if (status === 'banned') await setTeamBanned(account.teamName, false).catch(() => undefined);
+      alert(error instanceof Error ? error.message : 'Could not update team account.');
+    }
+  };
+
+  const handleWalletCredit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setWalletCreditMessage(null);
+    try {
+      const wallet = await creditTeamWallet(walletTeamName, Number(walletCreditAmount));
+      recordAdminActivity('wallet_credited', `Added ৳${Number(walletCreditAmount).toLocaleString()} to ${wallet.teamName}'s wallet.`, wallet.teamName);
+      setWalletCreditMessage(`৳${Number(walletCreditAmount).toLocaleString()} added. ${wallet.teamName}'s balance is now ৳${wallet.balance.toLocaleString()}.`);
+      setWalletCreditAmount('');
+    } catch (error) {
+      setWalletCreditMessage(error instanceof Error ? error.message : 'Could not credit this wallet.');
     }
   };
 
@@ -508,7 +571,11 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Filter teams for current tournament
   const currentTourTeams = teams.filter((t) => t.tournamentId === currentTour.id);
-  const tournamentsWithSlots = tournaments.filter((t) => t.registeredCount < t.maxTeams);
+  const activeScrims = tournaments.filter((tournament) => tournament.status !== 'completed');
+  const tournamentsWithSlots = activeScrims;
+  const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+  const pendingTeamAccounts = teamAccounts.filter((account) => account.status === 'pending').length;
+  const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();
     if (!q) return true;
@@ -621,13 +688,12 @@ export const AdminPanelModal: React.FC<Props> = ({
               <aside className="admin-sidebar flex w-52 shrink-0 flex-col gap-1 border-r border-[#23242e] pr-3">
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-                  { id: 'scrims', label: `Scrims (${tournaments.length})`, icon: CalendarDays },
+                  { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
+                  { id: 'accounts', label: `Account Requests (${pendingTeamAccounts})`, icon: Users },
+                  { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
                   { id: 'teams', label: `Registered Teams (${currentTourTeams.length})`, icon: Users },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
-                  { id: 'history', label: `Match History (${publishedTourResults.length})`, icon: HistoryIcon },
-                  { id: 'tournament', label: 'Tournament Info', icon: Sliders },
-                  { id: 'redirect', label: 'CG Group Link', icon: Link },
-                  { id: 'discord', label: 'Discord Relay', icon: Send },
+                  { id: 'history', label: `Match History (${publishedTourResults.length + completedScrims.length})`, icon: HistoryIcon },
                   { id: 'logs', label: `Activity Logs (${logs.length + activityLogs.length})`, icon: ListFilter },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -654,9 +720,9 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <Plus size={15} /> New Scrim
                     </button>
                   </div>
-                  {tournaments.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">Create your first scrim to start registrations.</div> : (
+                  {activeScrims.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No active scrims. Create a new scrim or view completed tournaments in Match History.</div> : (
                     <div className="space-y-2.5">
-                      {tournaments.map((tour) => {
+                      {activeScrims.map((tour) => {
                         const selected = tour.id === currentTour.id;
                         const full = tour.registeredCount >= tour.maxTeams;
                         return (
@@ -673,10 +739,19 @@ export const AdminPanelModal: React.FC<Props> = ({
                                   {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
                                 </div>
                               </div>
-                              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                <button type="button" onClick={() => { handleSelectTournament(tour); setTab('overview'); }} className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:bg-white/[.08]">Manage</button>
-                                <button type="button" disabled={full && tour.status !== 'open'} onClick={() => void handleToggleRegistration(tour)} className={`rounded-lg border px-3 py-2 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${tour.status === 'open' ? 'border-rose-300/20 bg-rose-300/[.06] text-rose-200 hover:bg-rose-300/10' : 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200 hover:bg-emerald-300/10'}`}>{tour.status === 'open' ? 'Close Registration' : 'Open Registration'}</button>
-                                <button type="button" onClick={() => void copyRegistrationLink(tour.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300/15 bg-indigo-300/[.05] px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/10">{copiedRegistrationLink === tour.id ? <Check size={13} /> : <Copy size={13} />} Registration Link</button>
+                              <div className="relative shrink-0">
+                                <button type="button" aria-label={`Actions for ${tour.name}`} aria-expanded={openScrimMenu === tour.id} onClick={() => setOpenScrimMenu((open) => open === tour.id ? null : tour.id)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:bg-orange-300/[.07] hover:text-white"><MoreVertical size={17} /></button>
+                                {openScrimMenu === tour.id && <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl">
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Manage teams</button>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('tournament'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('redirect'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('discord'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Server-side Discord relay</button>
+                                  <button type="button" disabled={full && tour.status !== 'open'} onClick={() => { void handleToggleRegistration(tour); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06] disabled:opacity-40">{tour.status === 'open' ? 'Close registration' : 'Open registration'}</button>
+                                  <button type="button" onClick={() => { void copyRegistrationLink(tour.id); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === tour.id ? 'Link copied' : 'Copy registration link'}</button>
+                                  <button type="button" onClick={() => void handleCompleteTournament(tour)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-emerald-200 hover:bg-emerald-300/[.08]">Complete tournament</button>
+                                  <div className="my-1 border-t border-white/[.07]" />
+                                  <button type="button" onClick={() => { setOpenScrimMenu(null); void handleDeleteTournament(tour.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button>
+                                </div>}
                               </div>
                             </div>
                           </article>
@@ -687,9 +762,53 @@ export const AdminPanelModal: React.FC<Props> = ({
                 </section>
               )}
 
+              {tab === 'accounts' && (
+                <section className="space-y-4">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Independent of tournament openings</div>
+                    <h3 className="mt-1 text-lg font-extrabold text-white">Team Account Requests</h3>
+                    <p className="mt-1 text-xs text-slate-400">Approve a squad here so its captain can log in before or between tournaments.</p>
+                  </div>
+                  {teamAccounts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No team account requests yet.</div> : (
+                    <div className="space-y-2.5">
+                      {teamAccounts.map((account) => (
+                        <article key={account.id} className="rounded-2xl border border-[#282934] bg-[#15161d] p-4">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{account.teamLogo ? <img src={account.teamLogo} alt="" className="h-full w-full object-cover" /> : <Gamepad2 size={20} className="m-3 text-slate-500" />}</div>
+                              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="text-sm font-bold text-white">{account.teamName}</h4><span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${account.status === 'approved' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : account.status === 'banned' || account.status === 'rejected' ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>{account.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{account.leaderName}</strong></div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">{account.players.map((player) => <span key={`${account.id}-${player.slotIndex}`}>{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`}: {player.name}</span>)}</div><div className="mt-1 text-[10px] text-slate-600">Submitted {new Date(account.createdAt).toLocaleString()}</div></div>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap gap-2">
+                              {account.status !== 'approved' && <button type="button" onClick={() => void handleTeamAccountStatus(account, 'approved')} className="rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] px-3 py-2 text-[10px] font-bold text-emerald-200">Approve</button>}
+                              {account.status !== 'rejected' && account.status !== 'banned' && <button type="button" onClick={() => void handleTeamAccountStatus(account, 'rejected')} className="rounded-lg border border-rose-300/20 bg-rose-300/[.06] px-3 py-2 text-[10px] font-bold text-rose-200">Reject</button>}
+                              <button type="button" onClick={() => { if (account.status === 'banned') void handleTeamAccountStatus(account, 'rejected'); else if (confirm(`Ban ${account.teamName} from all future registrations?`)) void handleTeamAccountStatus(account, 'banned'); }} className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-[10px] font-bold text-slate-300">{account.status === 'banned' ? 'Unban' : 'Ban team'}</button>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {tab === 'wallets' && (
+                <section className="space-y-4">
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-200">Team balances</div><h3 className="mt-1 text-lg font-extrabold text-white">Team Wallet</h3><p className="mt-1 text-xs text-slate-400">Credit a squad by team name. Paid tournament registration checks and deducts this balance automatically.</p></div>
+                  <form onSubmit={handleWalletCredit} className="grid gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-4 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+                    <label className="block"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Team name</span><input required list="wallet-team-names" value={walletTeamName} onChange={(event) => setWalletTeamName(event.target.value)} placeholder="Enter or choose team name" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"/><datalist id="wallet-team-names">{Array.from(new Set([...teamAccounts.map((account) => account.teamName), ...teams.map((team) => team.teamName)])).map((name) => <option key={name} value={name}/>)}</datalist></label>
+                    <label className="block"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Add amount (৳)</span><input required type="number" min="0.01" step="0.01" value={walletCreditAmount} onChange={(event) => setWalletCreditAmount(event.target.value)} placeholder="e.g. 500" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"/></label>
+                    <button type="submit" className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs font-extrabold text-black transition hover:brightness-110"><Plus size={14} className="mr-1 inline"/>Add money</button>
+                    {walletCreditMessage && <div role="status" className="sm:col-span-3 rounded-lg border border-white/[.08] bg-black/20 px-3 py-2 text-xs text-amber-100">{walletCreditMessage}</div>}
+                  </form>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Current balances</h4><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={walletSearch} onChange={(event) => setWalletSearch(event.target.value)} placeholder="Search team name" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] py-2 pl-9 pr-3 text-xs text-white outline-none focus:border-amber-300/30 sm:w-64"/></div></div>
+                  {visibleWallets.length ? <div className="space-y-2">{visibleWallets.map((wallet) => <article key={wallet.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#282934] bg-[#15161d] px-4 py-3"><div className="min-w-0"><div className="truncate text-sm font-bold text-white">{wallet.teamName}</div><div className="mt-1 text-[10px] text-slate-500">Updated {new Date(wallet.updatedAt).toLocaleString()}</div></div><div className="shrink-0 text-right text-lg font-black tabular-nums text-amber-200">৳{Number(wallet.balance || 0).toLocaleString()}</div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-xs text-slate-500">No wallet balances yet. Add funds by entering a squad name above.</div>}
+                </section>
+              )}
+
               {/* TAB 1: OVERVIEW */}
               {tab === 'overview' && (
                 <div className="space-y-5">
+                  <div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Organizer workspace</div><h3 className="mt-1 text-lg font-extrabold text-white">Overview</h3></div><div className="relative"><button type="button" aria-label="Overview settings" aria-expanded={openOverviewMenu} onClick={() => setOpenOverviewMenu((open) => !open)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:text-white"><MoreVertical size={17} /></button>{openOverviewMenu && <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { setTab('tournament'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { setTab('redirect'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">CG Group link</button><button type="button" onClick={() => { setTab('discord'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Server-side Discord relay</button></div>}</div></div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                       <div className="text-xs text-gray-400">Total Scrims</div>
@@ -762,25 +881,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <span className="font-bold text-white">
                               {t.registeredCount} / {t.maxTeams} Teams
                             </span>
-                            <button
-                              onClick={() => handleSelectTournament(t)}
-                              className="px-2.5 py-1 bg-[#20212a] hover:bg-[#2c2d38] text-indigo-300 rounded font-semibold transition-colors"
-                            >
-                              Manage
-                            </button>
-                            <button type="button" onClick={() => void copyRegistrationLink(t.id)} className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2.5 py-1 font-semibold text-indigo-300 transition hover:bg-indigo-500/20" title="Copy tournament registration link">
-                              {copiedRegistrationLink === t.id ? <Check size={12} /> : <Copy size={12} />}
-                              {copiedRegistrationLink === t.id ? 'Copied' : 'Reg link'}
-                            </button>
-                            {tournaments.length > 1 && (
-                              <button
-                                onClick={() => handleDeleteTournament(t.id)}
-                                className="text-gray-500 hover:text-red-400 p-1"
-                                title="Delete Tournament"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
+                            <div className="relative"><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { handleSelectTournament(t); setTab('teams'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Manage teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
                           </div>
                         </div>
                       ))}
@@ -1082,21 +1183,23 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'history' && (
                 <section className="space-y-4">
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Published results</div>
+                    <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Completed scrims</div>
                     <h3 className="mt-1 text-lg font-extrabold text-white">Match History</h3>
-                    <p className="mt-1 text-xs text-slate-400">Published results are archived here and shown on the public leaderboard.</p>
+                    <p className="mt-1 text-xs text-slate-400">Completed tournaments and published team placements.</p>
                   </div>
-                  {publishedTourResults.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No published matches yet. Publish results from the Results tab.</div> : (
-                    <div className="space-y-2">
-                      {publishedTourResults.map((result) => (
-                        <article key={result.id} className="flex flex-col gap-3 rounded-2xl border border-[#282934] bg-[#15161d] p-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black ${result.position === 1 ? 'bg-amber-300/10 text-amber-200' : 'bg-white/[.05] text-slate-300'}`}>{result.position === 1 ? <Crown size={17} /> : `#${result.position}`}</span>
-                            <div className="min-w-0"><div className="truncate text-sm font-bold text-white">{result.teamName}</div><div className="mt-1 truncate text-[11px] text-slate-400">{result.tournamentName} · {result.kills} kills · {result.points} pts</div></div>
+                  {completedScrims.length === 0 && publishedTourResults.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No match history yet. Complete a tournament to archive it here.</div> : (
+                    <div className="space-y-4">
+                      {completedScrims.map((tour) => {
+                        const placements = publishedTourResults.filter((result) => result.tournamentId === tour.id).sort((a, b) => a.position - b.position || b.kills - a.kills);
+                        return <article key={tour.id} className="overflow-hidden rounded-2xl border border-[#282934] bg-[#15161d]">
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[.06] px-4 py-3">
+                            <div><h4 className="text-sm font-extrabold text-white">{tour.name}</h4><p className="mt-1 text-[10px] text-slate-500">{tour.date} · {tour.time} · {tour.map || 'Bermuda'} · {placements.length} result{placements.length === 1 ? '' : 's'}</p></div>
+                            <button type="button" onClick={() => { if (confirm(`Delete ${tour.name} and its registrations/results permanently?`)) void handleDeleteTournament(tour.id); }} className="rounded-lg border border-rose-300/15 px-3 py-2 text-[10px] font-bold text-rose-200 transition hover:bg-rose-300/[.08]">Delete tournament</button>
                           </div>
-                          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end"><div className="text-right"><div className="text-[10px] text-slate-500">{new Date(result.publishedAt || result.createdAt).toLocaleString()}</div>{(result.earnings || 0) > 0 && <div className="mt-1 text-xs font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</div>}</div><span className="rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-emerald-200">Published</span></div>
-                        </article>
-                      ))}
+                          {placements.length ? <div className="divide-y divide-white/[.05]">{placements.map((result) => <div key={result.id} className="flex items-center justify-between gap-3 px-4 py-2.5"><div className="flex min-w-0 items-center gap-3"><span className={`w-8 text-center text-xs font-black ${result.position === 1 ? 'text-amber-200' : 'text-slate-400'}`}>{result.position === 1 ? <Crown size={15} className="mx-auto" /> : `#${result.position}`}</span><span className="truncate text-xs font-bold text-white">{result.teamName}</span></div><div className="flex shrink-0 items-center gap-3 text-[10px] text-slate-400"><span>{result.kills} kills</span><span>{result.points} pts</span>{(result.earnings || 0) > 0 && <span className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</span>}</div></div>)}</div> : <div className="px-4 py-5 text-xs text-slate-500">No published placements were recorded for this tournament.</div>}
+                        </article>;
+                      })}
+                      {publishedTourResults.some((result) => !completedScrims.some((tour) => tour.id === result.tournamentId)) && <div className="space-y-2"><div className="px-1 pt-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Published matches</div>{publishedTourResults.filter((result) => !completedScrims.some((tour) => tour.id === result.tournamentId)).map((result) => <article key={result.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#282934] bg-[#15161d] p-3"><div className="flex min-w-0 items-center gap-3"><span className="w-8 text-center text-xs font-black text-slate-300">#{result.position}</span><div className="min-w-0"><div className="truncate text-xs font-bold text-white">{result.teamName}</div><div className="truncate text-[10px] text-slate-500">{result.tournamentName}</div></div></div><div className="shrink-0 text-right text-[10px] text-slate-400">{result.kills} kills · {result.points} pts{(result.earnings || 0) > 0 && <div className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</div>}</div></article>)}</div>}
                     </div>
                   )}
                 </section>

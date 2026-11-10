@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, Copy, ExternalLink, Users, X } from 'lucide-react';
+import { CheckCircle2, Copy, Users, X } from 'lucide-react';
 import { Team, Tournament } from '../types/tournament';
 
 interface Props {
@@ -29,12 +29,6 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
     navigator.clipboard.writeText(team.registrationId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleRedirect = () => {
-    if (tournament.redirectLink) {
-      window.open(tournament.redirectLink, '_blank', 'noopener,noreferrer');
-    }
   };
 
   return (
@@ -131,22 +125,6 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
             </div>
           </div>
         </div>
-
-        {/* Registration Redirect Link Section */}
-        {tournament.redirectLinkEnabled && tournament.redirectLink && (
-          <div className="mb-5 p-3.5 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
-            <p className="text-[11px] text-indigo-200 mb-2">
-              Next Step: Join the official tournament WhatsApp/Discord group for room ID and password:
-            </p>
-            <button
-              onClick={handleRedirect}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-xs"
-            >
-              <ExternalLink size={15} />
-              {tournament.redirectButtonText || 'Open Group Link'}
-            </button>
-          </div>
-        )}
 
         {/* Footer Actions */}
         <div className="flex justify-end pt-3 border-t border-[#23242e]">

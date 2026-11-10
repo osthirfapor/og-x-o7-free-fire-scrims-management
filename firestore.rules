@@ -21,6 +21,45 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /team_accounts/{accountId} {
+      allow read: if true;
+      allow create: if request.auth == null
+        && request.resource.data.status == 'pending'
+        && request.resource.data.teamName is string
+        && request.resource.data.teamName.size() > 0
+        && request.resource.data.teamLogo is string
+        && request.resource.data.teamLogo.size() > 0
+        && request.resource.data.leaderName is string
+        && request.resource.data.leaderName.size() > 0
+        && request.resource.data.players is list
+        && request.resource.data.players.size() >= 4
+        && request.resource.data.players.size() <= 5;
+      allow update, delete: if isAdmin();
+    }
+
+    match /team_wallets/{walletId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.auth == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'updatedAt', 'lastDebit', 'lastTournamentId', 'lastTeamId'])
+        && request.resource.data.balance is number
+        && request.resource.data.lastDebit is number
+        && request.resource.data.lastDebit > 0
+        && request.resource.data.balance == resource.data.balance - request.resource.data.lastDebit
+        && request.resource.data.lastTournamentId is string
+        && request.resource.data.lastTeamId is string
+        && existsAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)/teams/$(request.resource.data.lastTeamId))
+        && getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)/teams/$(request.resource.data.lastTeamId)).data.walletKey == walletId
+        && getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)/teams/$(request.resource.data.lastTeamId)).data.teamName == resource.data.teamName
+        && existsAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId))
+        && getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)).data.category == 'paid'
+        && getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)).data.entryFeeAmount == request.resource.data.lastDebit
+        && getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)).data.registeredCount == get(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournamentId)).data.registeredCount + 1
+      );
+    }
+
     match /test/{docId} {
       allow read: if true;
       allow write: if false;
@@ -56,6 +95,14 @@ service cloud.firestore {
           && request.resource.data.players.size() >= 4
           && request.resource.data.players.size() <= 5
           && request.resource.data.playerNames is list
+          && (get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.category != 'paid' || (
+            request.resource.data.walletKey is string
+            && existsAfter(/databases/$(database)/documents/team_wallets/$(request.resource.data.walletKey))
+            && get(/databases/$(database)/documents/team_wallets/$(request.resource.data.walletKey)).data.teamName == request.resource.data.teamName
+            && getAfter(/databases/$(database)/documents/team_wallets/$(request.resource.data.walletKey)).data.lastDebit == getAfter(/databases/$(database)/documents/tournaments/$(tournamentId)).data.entryFeeAmount
+            && getAfter(/databases/$(database)/documents/team_wallets/$(request.resource.data.walletKey)).data.lastTeamId == teamId
+            && getAfter(/databases/$(database)/documents/team_wallets/$(request.resource.data.walletKey)).data.lastTournamentId == tournamentId
+          ))
         );
         allow update, delete: if isAdmin();
       }
