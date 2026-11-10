@@ -21,11 +21,34 @@ service cloud.firestore {
 
     match /tournaments/{tournamentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount', 'status', 'updatedAt'])
+        && request.resource.data.registeredCount == resource.data.registeredCount + 1
+        && resource.data.status == 'open'
+        && request.resource.data.registeredCount <= resource.data.maxTeams
+        && request.resource.data.status == (request.resource.data.registeredCount == resource.data.maxTeams ? 'closed' : 'open')
+      );
 
       match /teams/{teamId} {
         allow read: if true;
-        allow write: if isAdmin();
+        allow create: if isAdmin() || (
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.status == 'open'
+          && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.registeredCount
+            < get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.maxTeams
+          && getAfter(/databases/$(database)/documents/tournaments/$(tournamentId)).data.registeredCount
+            == get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.registeredCount + 1
+          && request.resource.data.status == 'approved'
+          && request.resource.data.tournamentId == tournamentId
+          && request.resource.data.teamName is string
+          && request.resource.data.teamName.size() > 0
+          && request.resource.data.registrationId is string
+          && request.resource.data.players is list
+          && request.resource.data.players.size() >= 4
+          && request.resource.data.players.size() <= 5
+          && request.resource.data.playerNames is list
+        );
+        allow update, delete: if isAdmin();
       }
     }
 

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ArrowRight, Gamepad2, KeyRound, ShieldCheck, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Gamepad2, KeyRound, ShieldCheck } from 'lucide-react';
 import { TeamProfile } from '../types/tournament';
 import { findRegisteredTeamProfile, getLocalTeamProfile, saveTeamProfile } from '../services/tournamentService';
 
 interface Props {
   onLoginSuccess: (profile: TeamProfile) => void;
   onOpenAdminSecret?: () => void;
+  onRegister?: () => void;
 }
 
-export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret }) => {
+export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister }) => {
   const existing = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(existing?.teamName || '');
   const [leaderName, setLeaderName] = useState(existing?.leaderName || '');
@@ -32,13 +33,13 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
     try {
       const profile = await findRegisteredTeamProfile(teamName, leaderName);
       if (!profile) {
-        setError('Ei Team Name ebong Captain IGN diye kono approved registration paoa jayni. Admin-er kache check korun.');
+        setError('Team not found. Check your details or register first.');
         return;
       }
       await saveTeamProfile(profile);
       onLoginSuccess(profile);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Login kora jayni. Connection check kore abar try korun.');
+      setError(cause instanceof Error ? cause.message : 'Could not connect. Try again.');
     } finally {
       setSaving(false);
     }
@@ -94,7 +95,7 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
             </div>
             <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-300">Registered squads only</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Welcome back, Captain</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-400">Tournament access is available after your squad is registered by the organizer.</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">Enter your registered team details.</p>
           </div>
 
           {error && (
@@ -140,13 +141,14 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
             </button>
           </form>
 
-          <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-white/5 bg-white/[.025] p-3.5 text-[10px] leading-5 text-slate-500">
-            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-300" />
-            <span>Access is matched against the team name and captain IGN from an approved tournament registration. For access issues, contact the organizer.</span>
-          </div>
+          {onRegister && (
+            <button type="button" onClick={onRegister} className="mt-3 w-full rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-xs font-bold text-slate-200 transition hover:border-indigo-300/30 hover:bg-indigo-400/10">
+              Register a squad
+            </button>
+          )}
 
-          <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-600">
-            <Users size={13} /> Verified squad access · Firebase tournament data
+          <div className="mt-5 flex items-center justify-center gap-2 text-[10px] text-slate-600">
+            <ShieldCheck size={13} className="text-emerald-300" /> Secure squad access
           </div>
         </div>
       </section>

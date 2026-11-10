@@ -47,7 +47,7 @@ import { PlayerSearchView } from './components/PlayerSearchView';
 import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
 
-const PUBLIC_READ_ONLY = import.meta.env.PROD || import.meta.env.VITE_READ_ONLY_MODE === 'true';
+const PUBLIC_READ_ONLY = import.meta.env.VITE_READ_ONLY_MODE === 'true';
 // The admin route is public to reach, but Firebase Auth + the protected admin
 // allowlist determine whether anyone can see or change admin data.
 const ADMIN_PANEL_ENABLED = true;
@@ -306,7 +306,38 @@ function MainApp() {
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}
+          onRegister={activeTournament ? () => setShowRegModal(true) : undefined}
         />
+        {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (
+          <RegistrationModal
+            tournament={activeTournament}
+            onSuccess={(team, tournament) => {
+              const profile: TeamProfile = {
+                userId: `${team.tournamentId}_${team.id}`,
+                registrationId: team.registrationId,
+                teamName: team.teamName,
+                teamLogo: team.teamLogo || '',
+                leaderName: team.leaderName,
+                players: team.players,
+                updatedAt: new Date().toISOString(),
+              };
+              void saveTeamProfile(profile);
+              setTeamProfile(profile);
+              setRegisteredSuccessTeam(team);
+              setActiveTournament(tournament);
+              setShowRegModal(false);
+              setShowSuccessModal(true);
+            }}
+            onClose={() => setShowRegModal(false)}
+          />
+        )}
+        {showSuccessModal && registeredSuccessTeam && activeTournament && (
+          <RegistrationSuccessModal
+            team={registeredSuccessTeam}
+            tournament={activeTournament}
+            onClose={() => setShowSuccessModal(false)}
+          />
+        )}
       </>
     );
   }

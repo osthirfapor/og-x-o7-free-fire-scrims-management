@@ -84,21 +84,21 @@ export async function registerTeam(params: {
   teamName: string;
   teamLogo?: string;
   leaderName: string;
-  players: Player[]; // 4 main + 1 backup
+  players: Player[]; // 4 main + optional backup
 }): Promise<{ team: Team; registrationId: string }> {
   const { tournament, teamName, teamLogo, leaderName, players } = params;
 
   // Basic validation
-  if (!teamName.trim()) throw new Error('Team Name lagbe (Team Name is required).');
-  if (!leaderName.trim()) throw new Error('Leader in-game name lagbe.');
-  if (players.length !== 5) throw new Error('5 jon player er in-game name lagbe (4 Main + 1 Backup).');
+  if (!teamName.trim()) throw new Error('Enter a team name.');
+  if (!leaderName.trim()) throw new Error('Enter the captain in-game name.');
+  if (players.length < 4 || players.length > 5) throw new Error('Add four main players and an optional backup.');
 
-  // Verify all 5 player in-game names are provided
+  // Every submitted player name must be present.
   for (let i = 0; i < players.length; i++) {
     const p = players[i];
     const roleLabel = p.role === 'backup' ? 'Backup Player' : `Main Player ${p.slotIndex}`;
     if (!p.name.trim()) {
-      throw new Error(`${roleLabel} er In-Game Name (IGN) enter korun.`);
+      throw new Error(`Enter the ${roleLabel} in-game name.`);
     }
   }
 
@@ -106,7 +106,7 @@ export async function registerTeam(params: {
   const names = players.map((p) => p.name.trim().toLowerCase());
   const uniqueNames = new Set(names);
   if (uniqueNames.size !== names.length) {
-    throw new Error('Eki squad e eki player er name 2 bar deya jabe na.');
+    throw new Error('Player names must be unique.');
   }
 
   const tournamentRef = doc(db, 'tournaments', tournament.id);
@@ -122,17 +122,17 @@ export async function registerTeam(params: {
   const resultTeam = await runTransaction(db, async (transaction) => {
     const tourSnap = await transaction.get(tournamentRef);
     if (!tourSnap.exists()) {
-      throw new Error('Tournament khuje pawa jayni.');
+      throw new Error('Tournament not found.');
     }
 
     const tourData = tourSnap.data() as Tournament;
 
     if (tourData.status !== 'open') {
-      throw new Error('Ei tournament er registration closed.');
+      throw new Error('Registration is closed.');
     }
 
     if (tourData.registeredCount >= tourData.maxTeams) {
-      throw new Error(`Slots full! Shob ${tourData.maxTeams} ti team slot fill hoye gese.`);
+      throw new Error('All team slots are full.');
     }
 
     // Query existing teams in this tournament to check for duplicate player names
@@ -151,7 +151,7 @@ export async function registerTeam(params: {
     for (const player of players) {
       const lowerName = player.name.trim().toLowerCase();
       if (registeredNamesSet.has(lowerName)) {
-        throw new Error(`Player "${player.name}" already ei tournament er onno ekta team e register kora ache!`);
+        throw new Error(`Player "${player.name}" is already registered in this tournament.`);
       }
     }
 
@@ -206,7 +206,7 @@ export async function registerTeam(params: {
         registrationId,
         teamName: resultTeam.newTeam.teamName,
         leaderName: resultTeam.newTeam.leaderName,
-        playerCount: 5,
+        playerCount: cleanPlayerNames.length,
         players: cleanPlayerNames,
         registrationTime: new Date().toLocaleString(),
         currentRegisteredCount: resultTeam.nextCount,
@@ -229,7 +229,7 @@ export async function registerTeam(params: {
       registrationId,
       teamName: resultTeam.newTeam.teamName,
       leaderName: resultTeam.newTeam.leaderName,
-      playerCount: 5,
+      playerCount: cleanPlayerNames.length,
       registeredCount: resultTeam.nextCount,
       remainingSlots: resultTeam.remainingSlots,
       discordDelivered: true,

@@ -103,30 +103,30 @@ export const RegistrationModal: React.FC<Props> = ({
     }
 
     if (isClosed) {
-      setError('Ei tournament er registration closed.');
+      setError('Registration is closed.');
       return;
     }
 
     if (!teamName.trim()) {
-      setError('Team Name enter korun.');
+      setError('Enter a team name.');
       return;
     }
 
-    // Check all 5 player names
-    for (let i = 0; i < players.length; i++) {
+    // Four starters are required; the fifth slot is an optional substitute.
+    for (let i = 0; i < 4; i++) {
       const p = players[i];
-      const roleLabel = p.role === 'backup' ? 'Backup Player (5th)' : `Player #${i + 1}`;
       if (!p.name.trim()) {
-        setError(`${roleLabel} er In-Game Name enter korun.`);
+        setError(`Enter Player #${i + 1}'s in-game name.`);
         return;
       }
     }
 
     // Duplicate name check
-    const names = players.map((p) => p.name.trim().toLowerCase());
+    const filledPlayers = players.filter((player) => player.name.trim());
+    const names = filledPlayers.map((p) => p.name.trim().toLowerCase());
     const uniqueNames = new Set(names);
     if (uniqueNames.size !== names.length) {
-      setError('Eki squad e eki player er name 2 bar deya jabe na.');
+      setError('Player names must be unique.');
       return;
     }
 
@@ -138,7 +138,7 @@ export const RegistrationModal: React.FC<Props> = ({
         teamName: teamName.trim(),
         teamLogo,
         leaderName,
-        players,
+        players: filledPlayers,
       });
 
       onSuccess(team, tournament);
@@ -151,8 +151,8 @@ export const RegistrationModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-[#141722] border border-[#262b3d] rounded-2xl shadow-2xl p-5 sm:p-6 text-white my-6 max-h-[94vh] flex flex-col">
+    <div className="registration-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="registration-card relative w-full max-w-lg bg-[#141722] border border-[#262b3d] rounded-2xl shadow-2xl p-5 sm:p-6 text-white my-6 max-h-[94vh] flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between pb-3.5 border-b border-[#212638]">
           <div className="flex items-center gap-3">
@@ -265,7 +265,7 @@ export const RegistrationModal: React.FC<Props> = ({
               <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Users size={14} /> Squad Players (In-Game Names)
               </h4>
-              <span className="text-[10px] text-gray-400">Edit or Swap with 5th player</span>
+              <span className="text-[10px] text-gray-400">4 players required · backup optional</span>
             </div>
 
             <div className="space-y-1.5">
@@ -311,7 +311,7 @@ export const RegistrationModal: React.FC<Props> = ({
                       value={p.name}
                       onChange={(e) => handlePlayerNameChange(idx, e.target.value)}
                       disabled={isFull || isClosed}
-                      required
+                      required={!isBackup}
                       maxLength={40}
                       className="flex-1 bg-[#151926] border border-[#2b324b] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
                     />
@@ -340,7 +340,7 @@ export const RegistrationModal: React.FC<Props> = ({
           {/* Footer Submit Buttons */}
           <div className="pt-3 border-t border-[#212638] flex items-center justify-between gap-3">
             <span className="text-[11px] text-gray-400">
-              Free Fire Scrims • 5 Players
+              Free Fire Scrims • 4 + optional backup
             </span>
 
             <div className="flex items-center gap-2">
