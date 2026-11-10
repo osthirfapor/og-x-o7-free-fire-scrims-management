@@ -396,6 +396,7 @@ export async function addMatchResult(params: {
   teamName: string;
   position: number;
   kills: number;
+  earnings?: number;
 }): Promise<void> {
   const id = `result_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const data: MatchResult = {
@@ -406,6 +407,7 @@ export async function addMatchResult(params: {
     position: params.position,
     kills: params.kills,
     points: calcPoints(params.position, params.kills),
+    earnings: Math.max(0, Number(params.earnings) || 0),
     createdAt: new Date().toISOString(),
   };
   try {
@@ -446,7 +448,10 @@ export function getLocalTeamProfile(): TeamProfile | null {
   try {
     const raw = localStorage.getItem(TEAM_PROFILE_LOCAL_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const profile = JSON.parse(raw) as TeamProfile;
+    // Old profiles were self-created in the browser. Only keep sessions tied
+    // to a squad that was registered through the admin-managed team list.
+    return profile.registrationId ? profile : null;
   } catch (e) {
     console.error('Failed to parse local team profile:', e);
     return null;
@@ -454,21 +459,39 @@ export function getLocalTeamProfile(): TeamProfile | null {
 }
 
 export async function saveTeamProfile(profile: TeamProfile): Promise<void> {
-  // Always save locally for instant offline/fast load
-  try {
-    localStorage.setItem(TEAM_PROFILE_LOCAL_KEY, JSON.stringify(profile));
-  } catch (e) {
-    console.error('Failed to save team profile to localStorage:', e);
+  localStorage.setItem(TEAM_PROFILE_LOCAL_KEY, JSON.stringify(profile));
+}
+
+export async function findRegisteredTeamProfile(teamName: string, leaderName: string): Promise<TeamProfile | null> {
+  const normalizedTeam = teamName.trim().toLocaleLowerCase();
+  const normalizedLeader = leaderName.trim().toLocaleLowerCase();
+  const tournamentSnapshot = await getDocs(collection(db, 'tournaments'));
+  const tournamentTeamSnapshots = await Promise.all(
+    tournamentSnapshot.docs.map((tournamentDoc) => getDocs(collection(db, 'tournaments', tournamentDoc.id, 'teams')))
+  );
+  let registered: Team | undefined;
+  for (const teamsSnapshot of tournamentTeamSnapshots) {
+    registered = teamsSnapshot.docs
+      .map((teamDoc) => ({ id: teamDoc.id, ...(teamDoc.data() as Omit<Team, 'id'>) }))
+      .find((team) => {
+        const leaderIgn = team.players?.find((player) => player.role === 'main' && player.slotIndex === 1)?.name || team.leaderName;
+        return team.status === 'approved'
+          && team.teamName.trim().toLocaleLowerCase() === normalizedTeam
+          && leaderIgn.trim().toLocaleLowerCase() === normalizedLeader;
+      });
+    if (registered) break;
   }
 
-  // Also sync to Firestore team_profiles collection
-  if (profile.userId) {
-    try {
-      await setDoc(doc(db, 'team_profiles', profile.userId), profile, { merge: true });
-    } catch (err) {
-      console.warn('Could not sync profile to Firestore, kept in local storage:', err);
-    }
-  }
+  if (!registered) return null;
+  return {
+    userId: `${registered.tournamentId}_${registered.id}`,
+    registrationId: registered.registrationId,
+    teamName: registered.teamName,
+    teamLogo: registered.teamLogo || '',
+    leaderName: registered.leaderName,
+    players: registered.players || [],
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function fetchTeamProfileFromCloud(userId: string): Promise<TeamProfile | null> {

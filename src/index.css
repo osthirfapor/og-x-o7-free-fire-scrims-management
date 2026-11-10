@@ -4,6 +4,9 @@
   color-scheme: dark;
   --motion-fast: 180ms;
   --motion-smooth: 420ms;
+  --surface-0: #090c13;
+  --surface-1: #10141e;
+  --line-soft: rgba(255, 255, 255, .075);
 }
 
 html {
@@ -12,7 +15,9 @@ html {
 
 body {
   overflow-x: hidden;
-  background: #0e1117;
+  background: var(--surface-0);
+  color: #f8fafc;
+  font-feature-settings: "ss01" on, "cv11" on;
 }
 
 button,
@@ -31,16 +36,16 @@ button:not(:disabled):active {
 }
 
 .app-main-content {
-  animation: content-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: content-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .app-main-content .grid > * {
   animation: card-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.app-main-content .grid > *:nth-child(2) { animation-delay: 60ms; }
-.app-main-content .grid > *:nth-child(3) { animation-delay: 120ms; }
-.app-main-content .grid > *:nth-child(4) { animation-delay: 180ms; }
+.app-main-content .grid > *:nth-child(2) { animation-delay: 65ms; }
+.app-main-content .grid > *:nth-child(3) { animation-delay: 130ms; }
+.app-main-content .grid > *:nth-child(4) { animation-delay: 195ms; }
 
 .animate-fade-in {
   animation: overlay-enter 220ms ease-out both;
@@ -61,12 +66,234 @@ button:not(:disabled):active {
   to { opacity: 1; }
 }
 
+.app-shell {
+  background:
+    radial-gradient(ellipse 50rem 36rem at 72% -12%, rgba(71, 80, 191, .14), transparent 68%),
+    radial-gradient(ellipse 42rem 30rem at 8% 92%, rgba(26, 147, 181, .075), transparent 72%),
+    #090c13;
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  width: 22rem;
+  height: 22rem;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(100px);
+  opacity: .12;
+  animation: ambient-drift 18s ease-in-out infinite alternate;
+}
+
+.app-shell::before {
+  top: 18%;
+  left: 20%;
+  background: #5b56f0;
+}
+
+.app-shell::after {
+  right: 7%;
+  bottom: 8%;
+  background: #16b8c8;
+  animation-delay: -8s;
+}
+
+.sidebar-shell {
+  background: linear-gradient(180deg, rgba(15, 19, 29, .98), rgba(11, 15, 23, .97));
+  border-color: var(--line-soft);
+  box-shadow: 12px 0 50px rgba(0, 0, 0, .18);
+}
+
+.topbar-shell {
+  background: linear-gradient(180deg, rgba(13, 17, 26, .91), rgba(13, 17, 26, .74));
+  border-color: var(--line-soft);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.sidebar-link {
+  overflow: hidden;
+}
+
+.sidebar-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .055), transparent);
+  transform: translateX(-110%);
+  transition: opacity .25s ease;
+}
+
+.sidebar-link:hover::after {
+  opacity: 1;
+  animation: nav-sheen .8s ease forwards;
+}
+
+.brand-icon {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  animation: icon-float 5s ease-in-out infinite;
+}
+
+.brand-icon::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -100% auto -100% -75%;
+  width: 48%;
+  transform: rotate(24deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.32), transparent);
+  animation: logo-sheen 5.5s ease-in-out infinite;
+}
+
+.brand-wordmark {
+  background: linear-gradient(105deg, #fff 4%, #d6d8ff 42%, #a8ecff 66%, #fff 90%);
+  background-size: 220% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: wordmark-shine 8s linear infinite;
+}
+
+.sidebar-link:hover,
+.tournament-card:hover,
+.player-card:hover {
+  transform: translateY(-2px);
+}
+
+.tournament-card {
+  animation: card-enter 640ms cubic-bezier(.22, 1, .36, 1) both;
+  will-change: transform;
+}
+
+.page-intro {
+  animation: content-enter 620ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.live-indicator {
+  animation: live-glow 3.8s ease-in-out infinite;
+}
+
+.player-card {
+  animation: card-enter 520ms cubic-bezier(.22, 1, .36, 1) both;
+  will-change: transform, opacity;
+}
+
+.login-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.login-panel {
+  animation: login-enter 760ms cubic-bezier(.18, 1, .32, 1) both;
+}
+
+.login-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom right, black, transparent 78%);
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, #a5b4fc, #c4b5fd 42%, #67e8f9);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.action-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.action-primary::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.17), transparent 70%);
+  transform: translateX(-120%);
+  transition: transform .8s cubic-bezier(.22, 1, .36, 1);
+}
+
+.action-primary:hover::after {
+  transform: translateX(120%);
+}
+
+.loading-dots::after {
+  content: "";
+  display: inline-block;
+  width: 1.1em;
+  text-align: left;
+  animation: loading-dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes ambient-drift {
+  from { transform: translate3d(-5%, -3%, 0) scale(.9); }
+  to { transform: translate3d(9%, 8%, 0) scale(1.18); }
+}
+
+@keyframes logo-sheen {
+  0%, 60% { transform: translateX(-10%) rotate(24deg); opacity: 0; }
+  72% { opacity: 1; }
+  100% { transform: translateX(420%) rotate(24deg); opacity: 0; }
+}
+
+@keyframes wordmark-shine {
+  to { background-position: 220% center; }
+}
+
+@keyframes icon-float {
+  0%, 100% { box-shadow: 0 8px 24px rgba(91, 86, 240, .22); }
+  50% { box-shadow: 0 10px 32px rgba(34, 211, 238, .2); }
+}
+
+@keyframes nav-sheen {
+  to { transform: translateX(110%); }
+}
+
+@keyframes live-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(52, 211, 153, 0); }
+  50% { box-shadow: 0 0 24px rgba(52, 211, 153, .07); }
+}
+
+@keyframes login-enter {
+  from { opacity: 0; transform: translateY(22px) scale(.985); filter: blur(8px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes loading-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .app-shell::before,
+  .app-shell::after,
+  .brand-icon,
+  .brand-icon::after,
+  .brand-wordmark,
+  .live-indicator,
+  .tournament-card,
+  .player-card,
+  .login-panel {
+    animation: none !important;
   }
 }
 

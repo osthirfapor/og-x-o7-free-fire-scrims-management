@@ -122,6 +122,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [resTeam, setResTeam] = useState('');
   const [resPosition, setResPosition] = useState(1);
   const [resKills, setResKills] = useState(0);
+  const [resEarnings, setResEarnings] = useState(0);
   const [resSaving, setResSaving] = useState(false);
   const [resMsg, setResMsg] = useState<string | null>(null);
 
@@ -393,9 +394,11 @@ export const AdminPanelModal: React.FC<Props> = ({
         teamName: resTeam,
         position: Number(resPosition),
         kills: Math.max(0, Number(resKills) || 0),
+        earnings: Math.max(0, Number(resEarnings) || 0),
       });
       setResMsg(`✅ ${resTeam} — Rank #${resPosition} saved.`);
       setResKills(0);
+      setResEarnings(0);
       setResPosition((p) => Math.min(12, p + 1));
       setResTeam('');
       setTimeout(() => setResMsg(null), 3000);
@@ -894,6 +897,19 @@ export const AdminPanelModal: React.FC<Props> = ({
                         </div>
                       </div>
 
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Team earnings (৳)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={resEarnings}
+                          onChange={(e) => setResEarnings(Number(e.target.value))}
+                          placeholder="0"
+                          className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
                       <div className="flex items-center justify-between bg-[#0d1017] border border-[#22273a] rounded-xl px-3 py-2 text-xs">
                         <span className="text-gray-400">Points (auto)</span>
                         <span className="font-mono font-bold text-indigo-300">{calcPoints(resPosition, resKills)} pts</span>
@@ -961,6 +977,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 <div className="font-bold text-white text-sm truncate">{r.teamName}</div>
                                 <div className="text-gray-400">
                                   {r.kills} kills • <span className="text-indigo-300 font-mono">{r.points} pts</span>
+                                  {(r.earnings || 0) > 0 && <span className="ml-2 text-emerald-300 font-semibold">৳{Number(r.earnings).toLocaleString()}</span>}
                                   {r.position === 1 && <span className="ml-2 text-amber-300 font-bold">WINNER</span>}
                                 </div>
                               </div>

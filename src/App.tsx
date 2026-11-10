@@ -35,6 +35,8 @@ import {
   subscribeMatchResults,
   buildLeaderboard,
   getLocalTeamProfile,
+  findRegisteredTeamProfile,
+  saveTeamProfile,
 } from './services/tournamentService';
 import { LeaderboardView } from './components/LeaderboardView';
 import { testConnection } from './lib/firebase';
@@ -76,12 +78,16 @@ function MainApp() {
   // Tournaments & Teams State from Firestore
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
-  const [currentTeams, setCurrentTeams] = useState<Team[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const currentTeams = useMemo(
+    () => allTeams.filter((team) => team.tournamentId === activeTournament?.id),
+    [allTeams, activeTournament?.id]
+  );
   const [loadingTournaments, setLoadingTournaments] = useState(true);
 
   // Captain / Team Profile State (for 1-click Auto-Refill)
   const [teamProfile, setTeamProfile] = useState<TeamProfile | null>(() => getLocalTeamProfile());
+  const [checkingTeamSession, setCheckingTeamSession] = useState(() => Boolean(getLocalTeamProfile()));
   const [headerCopiedLink, setHeaderCopiedLink] = useState(false);
 
   // Modals
@@ -114,6 +120,33 @@ function MainApp() {
     localStorage.removeItem('ogxo7_captain_team_profile');
     setTeamProfile(null);
   };
+
+  useEffect(() => {
+    if (!teamProfile) {
+      setCheckingTeamSession(false);
+      return;
+    }
+    let cancelled = false;
+    findRegisteredTeamProfile(teamProfile.teamName, teamProfile.leaderName)
+      .then(async (verifiedProfile) => {
+        if (cancelled) return;
+        if (!verifiedProfile || verifiedProfile.registrationId !== teamProfile.registrationId) {
+          localStorage.removeItem('ogxo7_captain_team_profile');
+          setTeamProfile(null);
+          return;
+        }
+        await saveTeamProfile(verifiedProfile);
+        if (!cancelled) setTeamProfile(verifiedProfile);
+      })
+      .catch((error) => {
+        console.error('Could not verify the saved squad session:', error);
+        if (!cancelled) setTeamProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingTeamSession(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleOpenRegistration = (tour?: Tournament) => {
     if (tour) setActiveTournament(tour);
@@ -171,18 +204,22 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // Subscribe to teams for the active tournament
+  // Subscribe to every tournament so search and player totals use full history.
+  const tournamentIds = tournaments.map((tournament) => tournament.id).sort().join('|');
   useEffect(() => {
-    if (!activeTournament) return;
-    const unsub = subscribeTeams(activeTournament.id, (teams) => {
-      setCurrentTeams(teams);
-      setAllTeams((prev) => {
-        const others = prev.filter((t) => t.tournamentId !== activeTournament.id);
-        return [...others, ...teams];
-      });
-    });
-    return () => unsub();
-  }, [activeTournament?.id]);
+    const ids = tournamentIds ? tournamentIds.split('|') : [];
+    if (ids.length === 0) {
+      setAllTeams([]);
+      return;
+    }
+    const unsubscribers = ids.map((tournamentId) => subscribeTeams(tournamentId, (teams) => {
+      setAllTeams((previous) => [
+        ...previous.filter((team) => team.tournamentId !== tournamentId),
+        ...teams,
+      ]);
+    }));
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [tournamentIds]);
 
   // Filter tournaments by category
   const filteredTournaments = useMemo(() => {
@@ -251,7 +288,17 @@ function MainApp() {
 
   // ================= MANDATORY LOGIN GATE =================
   // Without login, nothing else is shown except the Login Form & Copy Link option
-  if (!teamProfile && !PUBLIC_READ_ONLY) {
+  if (checkingTeamSession) {
+    return (
+      <main className="app-shell flex min-h-screen items-center justify-center p-6 text-white">
+        <div className="login-panel flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111621]/90 px-5 py-4 text-sm text-slate-300 shadow-2xl">
+          <span className="h-2 w-2 animate-ping rounded-full bg-cyan-300" /> Verifying your approved squad access…
+        </div>
+      </main>
+    );
+  }
+
+  if (!teamProfile) {
     return (
       <>
         <TeamLoginGate
@@ -265,10 +312,10 @@ function MainApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0e1117] text-white font-sans flex flex-col md:flex-row antialiased select-none pb-16 md:pb-0">
+    <div className="app-shell relative isolate min-h-screen text-white font-sans flex flex-col md:flex-row antialiased select-none">
       {/* ================= CLEAN DESKTOP LEFT SIDEBAR ================= */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#11141c] border-r border-[#1e2330] flex flex-col justify-between py-6 px-4 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        className={`sidebar-shell fixed inset-y-0 left-0 z-40 w-64 border-r flex flex-col justify-between py-6 px-4 transform transition-transform duration-500 ease-[cubic-bezier(.22,1,.36,1)] md:translate-x-0 ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -279,12 +326,12 @@ function MainApp() {
               onClick={handleLogoTap}
               className="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <div className="brand-icon w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                 <Gamepad2 size={18} className="text-white" />
               </div>
               <div>
-                <span className="font-extrabold text-base tracking-wider text-white">OG x o7</span>
-                <span className="block text-[10px] text-indigo-400 font-semibold uppercase tracking-wider">
+                <span className="brand-wordmark block font-extrabold text-base tracking-wider">OG x o7</span>
+                <span className="block text-[9px] text-indigo-300 font-bold uppercase tracking-[.2em]">
                   Free Fire Scrims
                 </span>
               </div>
@@ -314,7 +361,7 @@ function MainApp() {
                     if (item.key === 'tournaments') setCategoryFilter('all');
                     setMobileMenuOpen(false);
                   }}
-                  className={`relative w-full flex items-center gap-3 px-3.5 py-3 text-[13px] font-bold rounded-xl transition-all ${
+                  className={`sidebar-link relative w-full flex items-center gap-3 px-3.5 py-3 text-[13px] font-bold rounded-xl transition-all ${
                     active
                       ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/10 text-white border border-indigo-500/30 shadow-lg shadow-indigo-900/20'
                       : 'text-gray-400 hover:text-white hover:bg-[#161a25] border border-transparent'
@@ -332,7 +379,7 @@ function MainApp() {
         {/* Secret Desktop Footer */}
         <div
           onClick={handleLogoTap}
-          className="px-3 py-2 text-[11px] text-gray-500 cursor-default"
+          className="brand-wordmark px-3 py-2 text-[11px] text-gray-500 cursor-default"
         >
           OG x o7 Free Fire Esports
         </div>
@@ -347,9 +394,9 @@ function MainApp() {
       )}
 
       {/* ================= MAIN CONTENT WRAPPER ================= */}
-      <div className="flex-1 md:ml-64 flex flex-col min-w-0 bg-[#0e1117]">
+      <div className="relative z-[1] flex-1 md:ml-64 flex flex-col min-w-0">
         {/* TOP BAR / HEADER */}
-        <header className="h-16 border-b border-[#1b1f2b] bg-[#11141c]/90 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
+        <header className="topbar-shell h-[72px] border-b px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -365,89 +412,75 @@ function MainApp() {
               onClick={handleLogoTap}
               className="md:hidden flex items-center gap-2"
             >
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center">
+              <div className="brand-icon w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-cyan-400 flex items-center justify-center">
                 <Gamepad2 size={16} className="text-white" />
               </div>
-              <span className="font-extrabold text-sm tracking-wide text-white">OG x o7</span>
+              <span className="brand-wordmark font-extrabold text-sm tracking-wide">OG x o7</span>
             </div>
-
-            {/* Desktop View Tabs */}
-            <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm">
-              {[
-                { key: 'tournaments', label: 'Tournaments' },
-                { key: 'leaderboard', label: 'Leaderboard' },
-                { key: 'player_search', label: 'Player Search' },
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => {
-                    setActiveTab(item.key as any);
-                    if (item.key === 'tournaments') setCategoryFilter('all');
-                  }}
-                  className={`font-bold pb-1 transition-all ${
-                    activeTab === item.key
-                      ? 'text-white border-b-2 border-indigo-500'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
+            <div className="hidden md:block">
+              <div className="text-[9px] font-extrabold uppercase tracking-[.22em] text-slate-500">Squad command center</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300"><Sparkles size={12} className="text-cyan-300" /> Live scrim operations</div>
+            </div>
           </div>
 
-          {/* Right Header: Team Profile, Copy Link & Quick Register */}
+          {/* Signed-in squad status */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {!PUBLIC_READ_ONLY && <>
-            {/* Copy Login Link Button */}
-            <button
-              onClick={handleCopyLoginLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171a27] hover:bg-[#212638] border border-[#2b334a] text-indigo-300 hover:text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
-              title="Copy Team Login Link to share with other squad captains"
-            >
-              {headerCopiedLink ? (
-                <>
-                  <Check size={14} className="text-emerald-400" />
-                  <span className="text-emerald-400 font-bold hidden sm:inline">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={14} />
-                  <span className="hidden sm:inline">Copy Login Link</span>
-                </>
-              )}
-            </button>
-
-            {/* Team Profile Pill */}
-            <div className="flex items-center gap-2 px-2.5 py-1 bg-[#161a26] border border-[#2b3249] rounded-xl text-xs">
-              <Shield size={14} className="text-indigo-400 shrink-0" />
-              <span className="font-bold text-white max-w-[90px] sm:max-w-[120px] truncate">
-                {teamProfile.teamName}
-              </span>
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] px-3 py-2 text-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,.8)]" />
+              <span className="max-w-[160px] truncate font-semibold text-slate-200">{teamProfile.teamName}</span>
             </div>
-
-            {/* Switch / Logout Team */}
             <button
               onClick={handleLogoutTeam}
-              className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-[#1f2434] rounded-lg transition-colors"
-              title="Logout / Switch Team"
+              className="rounded-xl border border-white/5 p-2 text-slate-400 transition-all hover:border-rose-400/20 hover:bg-rose-400/10 hover:text-rose-300"
+              title="Log out"
+              aria-label="Log out"
             >
               <LogOut size={16} />
             </button>
-
-            {/* Register Team Button */}
-            <button
-              onClick={() => handleOpenRegistration(activeTournament || undefined)}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/30 transition-all shrink-0"
-            >
-              Register Team
-            </button>
-            </>}
+            {!PUBLIC_READ_ONLY && (
+              <>
+                <button
+                  onClick={handleCopyLoginLink}
+                  className="hidden items-center gap-1.5 rounded-xl border border-[#2b334a] bg-[#171a27] px-3 py-2 text-xs font-semibold text-indigo-300 shadow-sm transition-all hover:bg-[#212638] hover:text-white sm:flex"
+                  title="Copy Team Login Link"
+                >
+                  {headerCopiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  <span>{headerCopiedLink ? 'Copied!' : 'Copy Login Link'}</span>
+                </button>
+                <button
+                  onClick={() => handleOpenRegistration(activeTournament || undefined)}
+                  className="action-primary shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/25"
+                >
+                  Register Team
+                </button>
+              </>
+            )}
           </div>
         </header>
 
         {/* ================= BODY CONTENT AREA ================= */}
-        <div className="app-main-content flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto">
+        <div key={activeTab} className="app-main-content flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          <div className="page-intro mb-7 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-indigo-300">
+                <span className="h-px w-6 bg-gradient-to-r from-cyan-300 to-indigo-400" /> OG x o7 competitive hub
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+                {activeTab === 'tournaments' || activeTab === 'registered_teams'
+                  ? 'Tournament arena'
+                  : activeTab === 'leaderboard' ? 'Hall of champions' : 'Player directory'}
+              </h1>
+              <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+                {activeTab === 'tournaments' || activeTab === 'registered_teams'
+                  ? 'Find your next Free Fire scrim and secure your squad’s place.'
+                  : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Track squad registrations, match form and team earnings.'}
+              </p>
+            </div>
+            <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
+              {loadingTournaments ? 'Connecting to Firebase' : `${tournaments.length} tournaments live`}
+            </div>
+          </div>
           {/* TAB 1: ALL TOURNAMENTS WITH SQUARE SHAPE CARDS (Matches Image Reference) */}
           {activeTab === 'tournaments' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -523,11 +556,12 @@ function MainApp() {
                           onClick={() => {
                             setActiveTournament(tour);
                           }}
-                          className={`relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4 shadow-xl ${
+                          className={`tournament-card relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4 shadow-xl ${
                             isSelected
                               ? 'border-indigo-500 shadow-indigo-500/20 ring-2 ring-indigo-500/40 scale-[1.01]'
                               : 'border-[#22273a] hover:border-[#384260] bg-[#121520]'
                           }`}
+                          style={{ animationDelay: `${index * 55}ms` }}
                         >
                           {/* Background PNG Image with Dark Gaming Vignette */}
                           <div
@@ -716,39 +750,13 @@ function MainApp() {
           {/* TAB 4: PLAYER SEARCH VIEW */}
           {activeTab === 'player_search' && (
             <PlayerSearchView
-              teams={allTeams.length > 0 ? allTeams : currentTeams}
+              teams={allTeams}
               tournaments={tournaments}
+              matchResults={matchResults}
             />
           )}
         </div>
       </div>
-
-      {/* ================= STICKY MOBILE BOTTOM NAVIGATION BAR ================= */}
-      {/* Enables comfortable, native app-like mobile browsing */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#10131c]/95 backdrop-blur-md border-t border-[#1f2434] px-2 py-1.5 flex items-center justify-around text-[10px]">
-        {[
-          { key: 'tournaments', label: 'Tournaments', icon: <Flame size={20} /> },
-          { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy size={20} /> },
-          { key: 'player_search', label: 'Search', icon: <Search size={20} /> },
-        ].map((item) => {
-          const active = activeTab === item.key || (item.key === 'tournaments' && activeTab === 'registered_teams');
-          return (
-            <button
-              key={item.key}
-              onClick={() => {
-                setActiveTab(item.key as any);
-                if (item.key === 'tournaments') setCategoryFilter('all');
-              }}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
-                active ? 'text-indigo-400 font-bold' : 'text-gray-400'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
 
       {/* ================= MODALS ================= */}
       {/* 1. Team Registration Modal (Auto-refilled, No tournament dropdown selector) */}

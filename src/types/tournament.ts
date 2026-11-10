@@ -8,6 +8,7 @@ export type TournamentCategory = 'practice' | 'free' | 'paid';
 
 export interface TeamProfile {
   userId: string;
+  registrationId?: string;
   teamName: string;
   teamLogo: string;
   leaderName: string;
@@ -73,6 +74,7 @@ export interface MatchResult {
   position: number; // 1 = winner (Booyah)
   kills: number;
   points: number; // placement points + kills
+  earnings?: number; // team payout entered by the organizer
   createdAt: string;
 }
 
