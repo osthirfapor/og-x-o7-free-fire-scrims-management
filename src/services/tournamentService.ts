@@ -466,12 +466,28 @@ export async function addMatchResult(params: {
     kills: params.kills,
     points: calcPoints(params.position, params.kills),
     earnings: Math.max(0, Number(params.earnings) || 0),
+    published: false,
     createdAt: new Date().toISOString(),
   };
   try {
     await setDoc(doc(db, 'match_results', id), data);
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, `match_results/${id}`);
+  }
+}
+
+export async function publishTournamentResults(tournamentId: string): Promise<number> {
+  try {
+    const snapshot = await getDocs(collection(db, 'match_results'));
+    const drafts = snapshot.docs.filter((item) => {
+      const result = item.data() as MatchResult;
+      return result.tournamentId === tournamentId && result.published === false;
+    });
+    const publishedAt = new Date().toISOString();
+    await Promise.all(drafts.map((item) => updateDoc(item.ref, { published: true, publishedAt })));
+    return drafts.length;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `match_results/${tournamentId}`);
   }
 }
 

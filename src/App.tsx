@@ -151,13 +151,15 @@ function MainApp() {
     if (!requestedTournament) return;
     handledRegistrationLink.current = true;
     setActiveTournament(requestedTournament);
-    setShowRegModal(true);
+    setShowRegModal(requestedTournament.status === 'open' && requestedTournament.registeredCount < requestedTournament.maxTeams);
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('register');
     window.history.replaceState({}, '', cleanUrl.toString());
   }, [tournaments, isAdminPage]);
 
   const handleOpenRegistration = (tour?: Tournament) => {
+    const target = tour || activeTournament;
+    if (!target || target.status !== 'open' || target.registeredCount >= target.maxTeams) return;
     if (tour) setActiveTournament(tour);
     setShowRegModal(true);
   };
@@ -239,10 +241,11 @@ function MainApp() {
   }, [tournaments, categoryFilter]);
 
   // Real leaderboard built from admin-entered match results
-  const leaderboard = useMemo(() => buildLeaderboard(matchResults), [matchResults]);
-  const walletEntries = useMemo(() => matchResults
+  const publishedResults = useMemo(() => matchResults.filter((result) => result.published !== false), [matchResults]);
+  const leaderboard = useMemo(() => buildLeaderboard(publishedResults), [publishedResults]);
+  const walletEntries = useMemo(() => publishedResults
     .filter((result) => result.teamName.trim().toLocaleLowerCase() === teamProfile?.teamName.trim().toLocaleLowerCase() && Number(result.earnings) > 0)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [matchResults, teamProfile?.teamName]);
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [publishedResults, teamProfile?.teamName]);
   const walletTotal = walletEntries.reduce((sum, result) => sum + (Number(result.earnings) || 0), 0);
   const myStanding = useMemo(() => {
     if (!teamProfile) return null;
@@ -322,7 +325,7 @@ function MainApp() {
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}
-          onRegister={activeTournament ? () => setShowRegModal(true) : undefined}
+          onRegister={activeTournament?.status === 'open' && activeTournament.registeredCount < activeTournament.maxTeams ? () => setShowRegModal(true) : undefined}
         />
         {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (
           <RegistrationModal
@@ -775,7 +778,7 @@ function MainApp() {
 
           {/* TAB 2: LEADERBOARD */}
           {activeTab === 'leaderboard' && (
-            <LeaderboardView results={matchResults} tournaments={tournaments} />
+            <LeaderboardView results={publishedResults} tournaments={tournaments} />
           )}
 
           {/* TAB 3: REGISTERED TEAMS VIEW */}
@@ -792,7 +795,7 @@ function MainApp() {
             <PlayerSearchView
               teams={allTeams}
               tournaments={tournaments}
-              matchResults={matchResults}
+              matchResults={publishedResults}
             />
           )}
         </div>

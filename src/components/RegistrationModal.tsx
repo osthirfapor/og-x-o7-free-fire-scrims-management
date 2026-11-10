@@ -13,7 +13,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
-  const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo?.startsWith('data:image/')));
+  const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo));
   const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
   const [players, setPlayers] = useState<Player[]>([
     { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
@@ -70,7 +70,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
     setError(null);
     if (isUnavailable) { setError('Registration is currently closed.'); return; }
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
-    if (!teamLogo.trim()) { setError('Add a logo link or upload your team logo.'); return; }
+    if (!teamLogo.trim()) { setError('Upload your team logo.'); return; }
     if (!logoImageReady) { setError('Wait for the team logo preview to load.'); return; }
     const starters = players.slice(0, 4);
     const backup = players[4];
@@ -96,6 +96,19 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
       setLoading(false);
     }
   };
+
+  if (isUnavailable) {
+    return (
+      <div className="registration-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[#03050a]/80 p-4 backdrop-blur-xl">
+        <section className="registration-card w-full max-w-md rounded-3xl border border-white/10 bg-[#0e121c] p-7 text-center text-white shadow-2xl">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-200"><ShieldCheck size={22} /></div>
+          <h2 className="mt-4 text-lg font-bold">Registration unavailable</h2>
+          <p className="mt-2 text-sm text-slate-400">This tournament is no longer accepting entries.</p>
+          <button type="button" onClick={onClose} className="mt-5 rounded-xl bg-white/[.08] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[.12]">Back to tournaments</button>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="registration-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#03050a]/80 p-3 backdrop-blur-xl sm:p-6">
@@ -128,40 +141,6 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               disabled={isUnavailable}
               className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
             />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="registration-team-logo" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team logo <span className="text-rose-300">· required</span></label>
-            <div className="flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#07080b]">
-                {teamLogo && logoImageReady ? <img src={teamLogo} alt="Team logo preview" className="h-full w-full object-cover" /> : <Gamepad2 size={19} className="text-slate-600" />}
-              </div>
-              {savedProfile?.teamLogo ? (
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-emerald-200">Team logo saved</div>
-                  <p className="mt-1 text-[9px] text-slate-500">Your logo will be reused for this registration.</p>
-                </div>
-              ) : <div className="min-w-0 flex-1 space-y-2">
-                <input
-                  id="registration-team-logo-link" type="url" maxLength={500} autoComplete="url" value={teamLogo.startsWith('data:') ? '' : teamLogo}
-                  onChange={(event) => { setTeamLogo(event.target.value); setLogoImageReady(false); setLogoName(event.target.value ? 'Checking image link…' : ''); }}
-                  placeholder="Paste logo image link"
-                  disabled={isUnavailable}
-                  className="registration-input block h-10 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#07080b]/90 px-3.5 text-xs font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-600">or</span>
-                  <input
-                  id="registration-team-logo" type="file" accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}
-                  disabled={isUnavailable}
-                  className="registration-input block h-9 min-w-0 flex-1 cursor-pointer rounded-xl border border-white/[.09] bg-[#07080b]/90 px-2.5 py-1.5 text-[10px] font-medium text-white outline-none transition file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-2.5 file:py-1 file:text-[9px] file:font-bold file:text-indigo-200 disabled:opacity-50"
-                />
-                </div>
-                <p className="truncate pl-1 text-[9px] text-slate-600">{logoName || 'PNG, JPG or WebP · max 8 MB'}</p>
-              </div>}
-              {teamLogo && <img src={teamLogo} alt="" aria-hidden="true" className="hidden" onLoad={() => setLogoImageReady(true)} onError={() => setLogoImageReady(false)} />}
-            </div>
           </div>
 
           <div className="space-y-2.5">
@@ -205,6 +184,32 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               Add backup player <span className="text-[10px] font-normal text-slate-600">(optional)</span>
             </button>
           )}
+
+          <div className="space-y-2">
+            <label htmlFor="registration-team-logo" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Team logo <span className="text-rose-300">· required</span></label>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-2.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#07080b]">
+                {teamLogo && logoImageReady ? <img src={teamLogo} alt="Team logo preview" className="h-full w-full object-cover" /> : <Gamepad2 size={19} className="text-slate-600" />}
+              </div>
+              {savedProfile?.teamLogo ? (
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-emerald-200">Team logo saved</div>
+                  <p className="mt-1 text-[9px] text-slate-500">Your logo will be reused for this registration.</p>
+                </div>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <input
+                    id="registration-team-logo" type="file" required={!teamLogo} accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}
+                    disabled={isUnavailable}
+                    className="registration-input block h-11 min-w-0 w-full cursor-pointer rounded-xl border border-white/[.09] bg-[#07080b]/90 px-3 py-2 text-xs font-medium text-white outline-none transition file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:text-indigo-200 disabled:opacity-50"
+                  />
+                  <p className="mt-1 truncate pl-1 text-[9px] text-slate-600">{logoName || 'Upload PNG, JPG or WebP · max 8 MB'}</p>
+                </div>
+              )}
+              {teamLogo && <img src={teamLogo} alt="" aria-hidden="true" className="hidden" onLoad={() => setLogoImageReady(true)} onError={() => setLogoImageReady(false)} />}
+            </div>
+          </div>
 
           {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.07] px-3.5 py-3 text-xs leading-5 text-rose-200"><AlertCircle size={15} className="mt-0.5 shrink-0" />{error}</div>}
           {isUnavailable && <div className="text-center text-xs font-semibold text-amber-200">Registration is closed.</div>}

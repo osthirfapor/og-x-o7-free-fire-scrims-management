@@ -24,6 +24,8 @@ import {
   Copy,
   Ban,
   LayoutDashboard,
+  History as HistoryIcon,
+  CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Tournament, Team, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
@@ -43,6 +45,7 @@ import {
   setTeamBanned,
   calcPoints,
   buildLeaderboard,
+  publishTournamentResults,
 } from '../services/tournamentService';
 
 interface Props {
@@ -73,7 +76,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'teams' | 'results' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -238,13 +241,13 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
-  // Toggle Tournament Open/Closed
-  const toggleRegistration = async () => {
-    const nextStatus = currentTour.status === 'open' ? 'closed' : 'open';
+  // Toggle registration directly from the Scrims list.
+  const handleToggleRegistration = async (tour: Tournament) => {
+    const nextStatus = tour.status === 'open' ? 'closed' : 'open';
     try {
-      await updateTournament(currentTour.id, { status: nextStatus });
-      setTourStatus(nextStatus);
-      recordAdminActivity(nextStatus === 'open' ? 'registration_opened' : 'registration_closed', `Registration ${nextStatus} for ${currentTour.name}.`);
+      await updateTournament(tour.id, { status: nextStatus });
+      if (currentTour.id === tour.id) setTourStatus(nextStatus);
+      void writeAdminActivityLog({ eventType: nextStatus === 'open' ? 'registration_opened' : 'registration_closed', summary: `Registration ${nextStatus} for ${tour.name}.`, tournamentId: tour.id, tournamentName: tour.name }).catch((error) => console.warn('Could not save admin activity log:', error));
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
     }
@@ -481,9 +484,26 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
+  const handlePublishResults = async () => {
+    if (!draftTourResults.length) return;
+    if (!confirm(`Publish ${draftTourResults.length} result(s) for ${currentTour.name} to the public leaderboard and match history?`)) return;
+    try {
+      const publishedCount = await publishTournamentResults(currentTour.id);
+      recordAdminActivity('match_results_published', `Published ${publishedCount} result(s) for ${currentTour.name}.`);
+      setResMsg(`✅ ${publishedCount} result(s) published to Match History.`);
+      window.setTimeout(() => setResMsg(null), 3000);
+    } catch (err) {
+      setResMsg(`❌ ${err instanceof Error ? err.message : 'Could not publish results.'}`);
+    }
+  };
+
   const tourResults = results
     .filter((r) => r.tournamentId === currentTour.id)
     .sort((a, b) => a.position - b.position || b.kills - a.kills);
+  const draftTourResults = tourResults.filter((result) => result.published === false);
+  const publishedTourResults = results
+    .filter((result) => result.published !== false)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const overallBoard = buildLeaderboard(results);
 
   // Filter teams for current tournament
@@ -597,59 +617,14 @@ export const AdminPanelModal: React.FC<Props> = ({
         ) : (
           /* Logged In Admin Dashboard */
           <div className="flex-1 overflow-hidden flex flex-col mt-4">
-            {/* Top Scrim Selector & Quick Controls */}
-            <div className="bg-[#0e1119] border border-[#23242e] rounded-xl p-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-400 font-medium">Selected Scrim:</span>
-                <select
-                  value={currentTour.id}
-                  onChange={(e) => {
-                    const match = tournaments.find((t) => t.id === e.target.value);
-                    if (match) handleSelectTournament(match);
-                  }}
-                  className="bg-[#181c28] border border-[#2c2d38] rounded-lg px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {tournaments.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.status.toUpperCase()} • {t.registeredCount}/{t.maxTeams})
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => setShowCreateTour(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-lg hover:bg-indigo-600/30 transition-colors"
-                >
-                  <Plus size={13} /> New Scrim
-                </button>
-              </div>
-
-              {/* Status Switcher & Capacity quick indicators */}
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-gray-400">
-                  Slots: <span className="text-white font-bold">{currentTour.registeredCount}</span> /{' '}
-                  <span className="text-white font-bold">{currentTour.maxTeams}</span> Teams
-                </div>
-
-                <button
-                  onClick={toggleRegistration}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
-                    currentTour.status === 'open'
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                      : 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
-                  }`}
-                >
-                  {currentTour.status === 'open' ? '🟢 Registration OPEN' : '🔴 Registration CLOSED'}
-                </button>
-              </div>
-            </div>
-
-            <div className="admin-workspace mt-4 flex min-h-0 flex-1 gap-4">
+            <div className="admin-workspace flex min-h-0 flex-1 gap-4">
               <aside className="admin-sidebar flex w-52 shrink-0 flex-col gap-1 border-r border-[#23242e] pr-3">
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+                  { id: 'scrims', label: `Scrims (${tournaments.length})`, icon: CalendarDays },
                   { id: 'teams', label: `Registered Teams (${currentTourTeams.length})`, icon: Users },
-                  { id: 'results', label: `Results & Ranking (${tourResults.length})`, icon: Trophy },
+                  { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
+                  { id: 'history', label: `Match History (${publishedTourResults.length})`, icon: HistoryIcon },
                   { id: 'tournament', label: 'Tournament Info', icon: Sliders },
                   { id: 'redirect', label: 'CG Group Link', icon: Link },
                   { id: 'discord', label: 'Discord Relay', icon: Send },
@@ -667,6 +642,51 @@ export const AdminPanelModal: React.FC<Props> = ({
 
               {/* TAB CONTENT */}
               <div key={tab} className="admin-tab-panel min-h-0 flex-1 overflow-y-auto pr-1">
+              {tab === 'scrims' && (
+                <section className="space-y-4">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Tournament control</div>
+                      <h3 className="mt-1 text-lg font-extrabold text-white">Scrims</h3>
+                      <p className="mt-1 text-xs text-slate-400">Select a scrim to manage teams, results, and settings.</p>
+                    </div>
+                    <button type="button" onClick={() => setShowCreateTour(true)} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-orange-950/25 transition hover:-translate-y-0.5 hover:brightness-110">
+                      <Plus size={15} /> New Scrim
+                    </button>
+                  </div>
+                  {tournaments.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">Create your first scrim to start registrations.</div> : (
+                    <div className="space-y-2.5">
+                      {tournaments.map((tour) => {
+                        const selected = tour.id === currentTour.id;
+                        const full = tour.registeredCount >= tour.maxTeams;
+                        return (
+                          <article key={tour.id} className={`rounded-2xl border p-4 transition-all ${selected ? 'border-orange-300/35 bg-orange-300/[.045] shadow-lg shadow-orange-950/10' : 'border-[#282934] bg-[#15161d] hover:border-white/15'}`}>
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="truncate text-sm font-bold text-white">{tour.name}</h4>
+                                  {selected && <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-orange-200">Selected</span>}
+                                  <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
+                                </div>
+                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                                  <span>{tour.date} · {tour.time}</span><span>{tour.map || 'Bermuda'}</span><span>{tour.registeredCount}/{tour.maxTeams} teams</span>
+                                  {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                <button type="button" onClick={() => { handleSelectTournament(tour); setTab('overview'); }} className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:bg-white/[.08]">Manage</button>
+                                <button type="button" disabled={full && tour.status !== 'open'} onClick={() => void handleToggleRegistration(tour)} className={`rounded-lg border px-3 py-2 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${tour.status === 'open' ? 'border-rose-300/20 bg-rose-300/[.06] text-rose-200 hover:bg-rose-300/10' : 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200 hover:bg-emerald-300/10'}`}>{tour.status === 'open' ? 'Close Registration' : 'Open Registration'}</button>
+                                <button type="button" onClick={() => void copyRegistrationLink(tour.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300/15 bg-indigo-300/[.05] px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/10">{copiedRegistrationLink === tour.id ? <Check size={13} /> : <Copy size={13} />} Registration Link</button>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
+
               {/* TAB 1: OVERVIEW */}
               {tab === 'overview' && (
                 <div className="space-y-5">
@@ -1006,16 +1026,21 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
 
                   <div className="xl:col-span-3 bg-[#15161d] border border-[#272833] rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Results — {currentTour.name}</div>
-                      <span className="text-[11px] text-gray-400">{tourResults.length} entries</span>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Unpublished Results — {currentTour.name}</div>
+                        <span className="text-[11px] text-gray-500">Public leaderboard updates when you publish.</span>
+                      </div>
+                      <button type="button" disabled={!draftTourResults.length} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-[11px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+                        <CheckCircle2 size={13} /> Publish Results ({draftTourResults.length})
+                      </button>
                     </div>
 
-                    {tourResults.length === 0 ? (
-                      <div className="text-center text-xs text-gray-500 py-10">Ei scrim er kono result add kora hoyni.</div>
+                    {draftTourResults.length === 0 ? (
+                      <div className="text-center text-xs text-gray-500 py-10">No unpublished results. Add a result or view Match History.</div>
                     ) : (
                       <div className="space-y-2">
-                        {tourResults.map((r) => (
+                        {draftTourResults.map((r) => (
                           <div
                             key={r.id}
                             className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${
@@ -1052,6 +1077,29 @@ export const AdminPanelModal: React.FC<Props> = ({
                     )}
                   </div>
                 </div>
+              )}
+
+              {tab === 'history' && (
+                <section className="space-y-4">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Published results</div>
+                    <h3 className="mt-1 text-lg font-extrabold text-white">Match History</h3>
+                    <p className="mt-1 text-xs text-slate-400">Published results are archived here and shown on the public leaderboard.</p>
+                  </div>
+                  {publishedTourResults.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No published matches yet. Publish results from the Results tab.</div> : (
+                    <div className="space-y-2">
+                      {publishedTourResults.map((result) => (
+                        <article key={result.id} className="flex flex-col gap-3 rounded-2xl border border-[#282934] bg-[#15161d] p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black ${result.position === 1 ? 'bg-amber-300/10 text-amber-200' : 'bg-white/[.05] text-slate-300'}`}>{result.position === 1 ? <Crown size={17} /> : `#${result.position}`}</span>
+                            <div className="min-w-0"><div className="truncate text-sm font-bold text-white">{result.teamName}</div><div className="mt-1 truncate text-[11px] text-slate-400">{result.tournamentName} · {result.kills} kills · {result.points} pts</div></div>
+                          </div>
+                          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end"><div className="text-right"><div className="text-[10px] text-slate-500">{new Date(result.publishedAt || result.createdAt).toLocaleString()}</div>{(result.earnings || 0) > 0 && <div className="mt-1 text-xs font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</div>}</div><span className="rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-emerald-200">Published</span></div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
               )}
 
               {/* TAB 3: TOURNAMENT INFO & CAPACITY */}

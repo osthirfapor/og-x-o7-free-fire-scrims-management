@@ -86,6 +86,8 @@ export interface MatchResult {
   kills: number;
   points: number; // placement points + kills
   earnings?: number; // team payout entered by the organizer
+  published?: boolean;
+  publishedAt?: string;
   createdAt: string;
 }
 
