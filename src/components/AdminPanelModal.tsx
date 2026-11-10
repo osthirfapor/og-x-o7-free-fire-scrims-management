@@ -461,10 +461,10 @@ export const AdminPanelModal: React.FC<Props> = ({
   });
 
   return (
-    <div className={standalone ? 'fixed inset-0 z-50 h-screen w-screen overflow-auto bg-[#0b0e14] animate-fade-in' : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm animate-fade-in'}>
-      <div className={`relative w-full ${standalone ? 'min-h-screen max-w-none rounded-none border-0 shadow-none' : 'max-w-5xl max-h-[92vh] mx-auto rounded-2xl border border-[#262c3e] shadow-2xl'} bg-[#12151f] p-5 sm:p-7 text-white flex flex-col`}>
+    <div className={standalone ? 'fixed inset-0 z-50 h-screen w-screen overflow-auto bg-[#09090d] animate-fade-in' : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm animate-fade-in'}>
+      <div className={`relative w-full ${standalone ? 'min-h-screen max-w-none rounded-none border-0 shadow-none' : 'max-w-5xl max-h-[92vh] mx-auto rounded-2xl border border-[#282934] shadow-2xl'} bg-[#121319] p-5 sm:p-7 text-white flex flex-col`}>
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#212638]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#23242e]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
               <Shield size={22} />
@@ -486,7 +486,7 @@ export const AdminPanelModal: React.FC<Props> = ({
             {isAdmin && (
               <button
                 onClick={logout}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white bg-[#1a1e2c] rounded-lg hover:bg-[#23283a] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white bg-[#1c1d26] rounded-lg hover:bg-[#25262f] transition-colors"
                 title="Log out of admin session"
               >
                 <LogOut size={14} /> Log out
@@ -494,7 +494,7 @@ export const AdminPanelModal: React.FC<Props> = ({
             )}
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#202536] transition-colors"
+              className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#22232c] transition-colors"
             >
               <X size={20} />
             </button>
@@ -506,7 +506,7 @@ export const AdminPanelModal: React.FC<Props> = ({
           <div className="py-12 text-center text-sm text-gray-400">Checking Firebase admin access…</div>
         ) : !isAdmin ? (
           <div className="py-12 px-4 max-w-md mx-auto text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400 shadow-[0_0_25px_rgba(99,102,241,0.2)]">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400 shadow-[0_0_25px_rgba(255,95,26,0.25)]">
               <Lock size={30} />
             </div>
 
@@ -533,7 +533,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   placeholder="Admin email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                  className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
                 />
               </div>
               <div>
@@ -543,7 +543,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                  className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
                 />
               </div>
               <button
@@ -559,7 +559,7 @@ export const AdminPanelModal: React.FC<Props> = ({
           /* Logged In Admin Dashboard */
           <div className="flex-1 overflow-hidden flex flex-col mt-4">
             {/* Top Scrim Selector & Quick Controls */}
-            <div className="bg-[#0e1119] border border-[#212638] rounded-xl p-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="bg-[#0e1119] border border-[#23242e] rounded-xl p-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-gray-400 font-medium">Selected Scrim:</span>
                 <select
@@ -568,7 +568,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     const match = tournaments.find((t) => t.id === e.target.value);
                     if (match) handleSelectTournament(match);
                   }}
-                  className="bg-[#181c28] border border-[#2b3249] rounded-lg px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
+                  className="bg-[#181c28] border border-[#2c2d38] rounded-lg px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
                 >
                   {tournaments.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -606,7 +606,7 @@ export const AdminPanelModal: React.FC<Props> = ({
             </div>
 
             {/* Admin Tabs */}
-            <div className="flex items-center gap-2 border-b border-[#212638] pb-2 overflow-x-auto text-xs">
+            <div className="flex items-center gap-2 border-b border-[#23242e] pb-2 overflow-x-auto text-xs">
               <button
                 onClick={() => setTab('overview')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
@@ -671,21 +671,21 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'overview' && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                       <div className="text-xs text-gray-400">Total Scrims</div>
                       <div className="text-2xl font-bold text-white mt-1">{tournaments.length}</div>
                     </div>
-                    <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                       <div className="text-xs text-gray-400">Registered Teams</div>
                       <div className="text-2xl font-bold text-indigo-400 mt-1">{currentTourTeams.length}</div>
                     </div>
-                    <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                       <div className="text-xs text-gray-400">Remaining Slots</div>
                       <div className="text-2xl font-bold text-emerald-400 mt-1">
                         {Math.max(0, currentTour.maxTeams - currentTour.registeredCount)}
                       </div>
                     </div>
-                    <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                       <div className="text-xs text-gray-400">Total Players</div>
                       <div className="text-2xl font-bold text-purple-400 mt-1">
                         {currentTourTeams.length * 5} / {currentTour.maxTeams * 5}
@@ -707,7 +707,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   )}
 
                   {/* Scrims List in Overview */}
-                  <div className="bg-[#151926] border border-[#242b3e] rounded-xl p-4">
+                  <div className="bg-[#15161d] border border-[#272833] rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
                         All Tournaments & Scrims
@@ -720,7 +720,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </button>
                     </div>
 
-                    <div className="divide-y divide-[#202536]">
+                    <div className="divide-y divide-[#22232c]">
                       {tournaments.map((t) => (
                         <div key={t.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
@@ -744,7 +744,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             </span>
                             <button
                               onClick={() => handleSelectTournament(t)}
-                              className="px-2.5 py-1 bg-[#1e2334] hover:bg-[#272e44] text-indigo-300 rounded font-semibold transition-colors"
+                              className="px-2.5 py-1 bg-[#20212a] hover:bg-[#2c2d38] text-indigo-300 rounded font-semibold transition-colors"
                             >
                               Manage
                             </button>
@@ -778,7 +778,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       placeholder="Filter teams by name, leader, or Registration ID..."
                       value={teamSearch}
                       onChange={(e) => setTeamSearch(e.target.value)}
-                      className="w-full sm:w-80 bg-[#0d1017] border border-[#262c3e] rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full sm:w-80 bg-[#0b0c10] border border-[#282934] rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                     />
                     <div className="flex items-center gap-3 ml-auto">
                       <div className="text-xs text-gray-400">
@@ -796,7 +796,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
 
                   {searchedTeams.length === 0 ? (
-                    <div className="bg-[#151926] p-8 rounded-xl text-center text-gray-400 text-xs">
+                    <div className="bg-[#15161d] p-8 rounded-xl text-center text-gray-400 text-xs">
                       No registered teams found for this scrim.
                     </div>
                   ) : (
@@ -804,11 +804,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                       {searchedTeams.map((team, idx) => (
                         <div
                           key={team.id}
-                          className="bg-[#151926] border border-[#242b3e] p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          className="bg-[#15161d] border border-[#272833] p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-indigo-400 bg-[#0f121a] px-2 py-0.5 rounded border border-[#212638]">
+                              <span className="font-mono text-xs text-indigo-400 bg-[#0d0e13] px-2 py-0.5 rounded border border-[#23242e]">
                                 #{idx + 1} • {team.registrationId}
                               </span>
                               <h4 className="text-sm font-bold text-white">{team.teamName}</h4>
@@ -863,14 +863,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 setEditTeamName(team.teamName);
                                 setEditLeaderName(team.leaderName);
                               }}
-                              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#202536] rounded-lg"
+                              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#22232c] rounded-lg"
                               title="Edit Team"
                             >
                               <Edit2 size={15} />
                             </button>
                             <button
                               onClick={() => handleDeleteTeam(team)}
-                              className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-[#202536] rounded-lg"
+                              className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-[#22232c] rounded-lg"
                               title="Delete Team & Free Slot"
                             >
                               <Trash2 size={15} />
@@ -887,7 +887,7 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'results' && (
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
                   <div className="xl:col-span-2 space-y-4">
-                    <form onSubmit={handleAddResult} className="bg-[#151926] border border-[#242b3e] rounded-xl p-4 space-y-3">
+                    <form onSubmit={handleAddResult} className="bg-[#15161d] border border-[#272833] rounded-xl p-4 space-y-3">
                       <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                         <Trophy size={14} /> Add Match Result
                       </div>
@@ -900,7 +900,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         <select
                           value={resTeam}
                           onChange={(e) => setResTeam(e.target.value)}
-                          className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                         >
                           <option value="">— Select registered team —</option>
                           {currentTourTeams.map((t) => (
@@ -917,7 +917,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <select
                             value={resPosition}
                             onChange={(e) => setResPosition(Number(e.target.value))}
-                            className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                           >
                             {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                               <option key={n} value={n}>
@@ -933,7 +933,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             min="0"
                             value={resKills}
                             onChange={(e) => setResKills(Number(e.target.value))}
-                            className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
                           />
                         </div>
                       </div>
@@ -947,16 +947,16 @@ export const AdminPanelModal: React.FC<Props> = ({
                           value={resEarnings}
                           onChange={(e) => setResEarnings(Number(e.target.value))}
                           placeholder="0"
-                          className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
                         />
                       </div>
 
-                      <div className="flex items-center justify-between bg-[#0d1017] border border-[#22273a] rounded-xl px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between bg-[#0b0c10] border border-[#25262f] rounded-xl px-3 py-2 text-xs">
                         <span className="text-gray-400">Points (auto)</span>
                         <span className="font-mono font-bold text-indigo-300">{calcPoints(resPosition, resKills)} pts</span>
                       </div>
 
-                      {resMsg && <div className="text-xs text-gray-200 bg-[#0f121b] border border-[#262c3e] rounded-lg px-3 py-2">{resMsg}</div>}
+                      {resMsg && <div className="text-xs text-gray-200 bg-[#0d0e13] border border-[#282934] rounded-lg px-3 py-2">{resMsg}</div>}
 
                       <button
                         type="submit"
@@ -967,14 +967,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </button>
                     </form>
 
-                    <div className="bg-[#151926] border border-[#242b3e] rounded-xl p-4">
+                    <div className="bg-[#15161d] border border-[#272833] rounded-xl p-4">
                       <div className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-3">Overall Wins Ranking</div>
                       {overallBoard.length === 0 ? (
                         <p className="text-xs text-gray-500">Kono result nei.</p>
                       ) : (
                         <div className="space-y-1.5">
                           {overallBoard.slice(0, 10).map((e, i) => (
-                            <div key={e.teamName} className="flex items-center justify-between text-xs bg-[#0f121a] border border-[#1e2333] rounded-lg px-3 py-2">
+                            <div key={e.teamName} className="flex items-center justify-between text-xs bg-[#0d0e13] border border-[#20212a] rounded-lg px-3 py-2">
                               <span className="flex items-center gap-2 min-w-0">
                                 <span className="font-black text-gray-500 w-4">{i + 1}</span>
                                 <span className="font-semibold text-white truncate">{e.teamName}</span>
@@ -989,7 +989,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  <div className="xl:col-span-3 bg-[#151926] border border-[#242b3e] rounded-xl p-4">
+                  <div className="xl:col-span-3 bg-[#15161d] border border-[#272833] rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Results — {currentTour.name}</div>
                       <span className="text-[11px] text-gray-400">{tourResults.length} entries</span>
@@ -1003,13 +1003,13 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <div
                             key={r.id}
                             className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${
-                              r.position === 1 ? 'bg-amber-500/5 border-amber-500/30' : 'bg-[#0f121a] border-[#1e2333]'
+                              r.position === 1 ? 'bg-amber-500/5 border-amber-500/30' : 'bg-[#0d0e13] border-[#20212a]'
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <span
                                 className={`w-8 h-8 rounded-lg flex items-center justify-center font-black shrink-0 ${
-                                  r.position === 1 ? 'bg-amber-500/20 text-amber-300' : 'bg-[#1b2030] text-gray-300'
+                                  r.position === 1 ? 'bg-amber-500/20 text-amber-300' : 'bg-[#1e1f27] text-gray-300'
                                 }`}
                               >
                                 {r.position === 1 ? <Crown size={15} /> : `#${r.position}`}
@@ -1025,7 +1025,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             </div>
                             <button
                               onClick={() => handleDeleteResult(r)}
-                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-[#202536] rounded-lg shrink-0"
+                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-[#22232c] rounded-lg shrink-0"
                               title="Delete result"
                             >
                               <Trash2 size={15} />
@@ -1055,7 +1055,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       type="text"
                       value={tourName}
                       onChange={(e) => setTourName(e.target.value)}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
 
@@ -1069,7 +1069,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         value={tourDate}
                         onChange={(e) => setTourDate(e.target.value)}
                         placeholder="e.g. Nov 09, 2026"
-                        className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                     <div>
@@ -1081,7 +1081,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         value={tourTime}
                         onChange={(e) => setTourTime(e.target.value)}
                         placeholder="e.g. 18:00 UTC"
-                        className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -1097,7 +1097,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         max="48"
                         value={tourMaxTeams}
                         onChange={(e) => setTourMaxTeams(Number(e.target.value))}
-                        className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
                       />
                     </div>
 
@@ -1107,7 +1107,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         {MAP_OPTIONS.map((map) => {
                           const selected = tourMap.split(',').map((value) => value.trim()).includes(map);
                           return (
-                            <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${selected ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2b334a] bg-[#0d1017] text-gray-400 hover:text-white'}`}>
+                            <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${selected ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2a2b36] bg-[#0b0c10] text-gray-400 hover:text-white'}`}>
                               <input
                                 type="checkbox"
                                 checked={selected}
@@ -1131,7 +1131,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <select
                         value={tourStatus}
                         onChange={(e) => setTourStatus(e.target.value as any)}
-                        className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                       >
                         <option value="open">Open</option>
                         <option value="closed">Closed</option>
@@ -1149,7 +1149,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       value={tourCardImage}
                       onChange={(e) => setTourCardImage(e.target.value)}
                       placeholder="https://example.com/tournament-art.jpg"
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                     />
                     <p className="text-[11px] text-gray-500 mt-1">Leave blank to use the built-in category artwork.</p>
                   </div>
@@ -1172,7 +1172,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
                   )}
 
-                  <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                  <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                     <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                       <Link size={14} /> Registration Redirect Link Feature
                     </div>
@@ -1187,7 +1187,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       id="enableRedirect"
                       checked={redirectEnabled}
                       onChange={(e) => setRedirectEnabled(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-[#0d1017] border-[#2b334a]"
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-[#0b0c10] border-[#2a2b36]"
                     />
                     <label htmlFor="enableRedirect" className="text-xs font-medium text-white cursor-pointer">
                       Enable Redirect Button after registration confirmation
@@ -1203,7 +1203,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       placeholder="https://discord.gg/your-scrims or https://chat.whatsapp.com/..."
                       value={redirectLink}
                       onChange={(e) => setRedirectLink(e.target.value)}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
                     />
                   </div>
 
@@ -1216,7 +1216,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       placeholder="e.g. Join Official Discord Lounge"
                       value={redirectBtnText}
                       onChange={(e) => setRedirectBtnText(e.target.value)}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
 
@@ -1243,7 +1243,7 @@ export const AdminPanelModal: React.FC<Props> = ({
               {/* TAB 5: DISCORD WEBHOOK RELAY (Requirement 6) */}
               {tab === 'discord' && (
                 <div className="space-y-4 max-w-xl">
-                  <div className="bg-[#151926] p-4 rounded-xl border border-[#242b3e]">
+                  <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
                     <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                       <Send size={14} /> Server-Side Discord Relay
                     </div>
@@ -1253,7 +1253,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
 
                   {discordMasked && (
-                    <div className="bg-[#0f121b] border border-[#23283a] p-3 rounded-xl text-xs flex items-center justify-between">
+                    <div className="bg-[#0d0e13] border border-[#25262f] p-3 rounded-xl text-xs flex items-center justify-between">
                       <div>
                         <span className="text-gray-400">Current Webhook:</span>{' '}
                         <span className="text-emerald-400 font-mono font-medium">{discordMasked}</span>
@@ -1274,7 +1274,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         placeholder="https://discord.com/api/webhooks/..."
                         value={discordWebhookUrl}
                         onChange={(e) => setDiscordWebhookUrl(e.target.value)}
-                        className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
                       />
                     </div>
 
@@ -1289,7 +1289,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         type="button"
                         onClick={handleTestDiscord}
                         disabled={discordTestLoading}
-                        className="px-4 py-2 bg-[#202536] hover:bg-[#282f45] text-indigo-300 font-semibold rounded-xl text-xs transition-colors"
+                        className="px-4 py-2 bg-[#22232c] hover:bg-[#2c2d39] text-indigo-300 font-semibold rounded-xl text-xs transition-colors"
                       >
                         {discordTestLoading ? 'Sending Test...' : 'Send Test Notification'}
                       </button>
@@ -1297,7 +1297,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </form>
 
                   {discordTestStatus && (
-                    <div className="p-3 bg-[#0f121b] border border-[#262c3e] rounded-xl text-xs text-white">
+                    <div className="p-3 bg-[#0d0e13] border border-[#282934] rounded-xl text-xs text-white">
                       {discordTestStatus}
                     </div>
                   )}
@@ -1312,7 +1312,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
 
                   {logs.length === 0 ? (
-                    <div className="bg-[#151926] p-8 rounded-xl text-center text-gray-400 text-xs">
+                    <div className="bg-[#15161d] p-8 rounded-xl text-center text-gray-400 text-xs">
                       No registration logs recorded yet.
                     </div>
                   ) : (
@@ -1320,7 +1320,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       {logs.map((log) => (
                         <div
                           key={log.id}
-                          className="bg-[#151926] border border-[#242b3e] p-3 rounded-xl text-xs flex items-center justify-between gap-3"
+                          className="bg-[#15161d] border border-[#272833] p-3 rounded-xl text-xs flex items-center justify-between gap-3"
                         >
                           <div>
                             <div className="flex items-center gap-2">
@@ -1354,8 +1354,8 @@ export const AdminPanelModal: React.FC<Props> = ({
         {/* Create Tournament Sub-Modal */}
         {showCreateTour && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[#161a25] border border-[#2b334a] rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto text-white">
-              <div className="flex items-center justify-between pb-3 border-b border-[#212638] mb-4">
+            <div className="bg-[#17181f] border border-[#2a2b36] rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto text-white">
+              <div className="flex items-center justify-between pb-3 border-b border-[#23242e] mb-4">
                 <h3 className="font-bold text-base">Create New Free Fire Scrim</h3>
                 <button
                   onClick={() => setShowCreateTour(false)}
@@ -1374,7 +1374,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     placeholder="e.g. OG x o7 Squad Clash #4"
                     value={newTourName}
                     onChange={(e) => setNewTourName(e.target.value)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1385,7 +1385,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       placeholder="e.g. Nov 14, 2026"
                       value={newTourDate}
                       onChange={(e) => setNewTourDate(e.target.value)}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                     />
                   </div>
                   <div>
@@ -1395,7 +1395,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       placeholder="18:00 UTC"
                       value={newTourTime}
                       onChange={(e) => setNewTourTime(e.target.value)}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                     />
                   </div>
                 </div>
@@ -1408,14 +1408,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                       max="48"
                       value={newTourMax}
                       onChange={(e) => setNewTourMax(Number(e.target.value))}
-                      className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                     />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-400 mb-2">Select Maps</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {MAP_OPTIONS.map((map) => (
-                        <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${newTourMap.includes(map) ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2b334a] bg-[#0d1017] text-gray-400 hover:text-white'}`}>
+                        <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${newTourMap.includes(map) ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2a2b36] bg-[#0b0c10] text-gray-400 hover:text-white'}`}>
                           <input
                             type="checkbox"
                             checked={newTourMap.includes(map)}
@@ -1434,7 +1434,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   <select
                     value={newTourCategory}
                     onChange={(e) => setNewTourCategory(e.target.value as any)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   >
                     <option value="practice">Practice Tournament</option>
                     <option value="free">Free Tournament</option>
@@ -1449,7 +1449,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     placeholder="https://discord.gg/..."
                     value={newTourGroupLink}
                     onChange={(e) => setNewTourGroupLink(e.target.value)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
                   <p className="text-[10px] text-gray-500 mt-1">This link powers the Join Official Discord Lounge button after registration.</p>
                 </div>
@@ -1461,7 +1461,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     placeholder="https://example.com/tournament-art.jpg"
                     value={newTourCardImage}
                     onChange={(e) => setNewTourCardImage(e.target.value)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
                   <p className="text-[10px] text-gray-500 mt-1">Optional. Leave blank to use the default tournament artwork.</p>
                 </div>
@@ -1470,7 +1470,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setShowCreateTour(false)}
-                    className="px-3 py-1.5 bg-[#202536] text-gray-300 rounded-lg text-xs"
+                    className="px-3 py-1.5 bg-[#22232c] text-gray-300 rounded-lg text-xs"
                   >
                     Cancel
                   </button>
@@ -1489,8 +1489,8 @@ export const AdminPanelModal: React.FC<Props> = ({
         {/* Edit Team Sub-Modal */}
         {editingTeam && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[#161a25] border border-[#2b334a] rounded-2xl p-6 w-full max-w-md text-white">
-              <div className="flex items-center justify-between pb-3 border-b border-[#212638] mb-4">
+            <div className="bg-[#17181f] border border-[#2a2b36] rounded-2xl p-6 w-full max-w-md text-white">
+              <div className="flex items-center justify-between pb-3 border-b border-[#23242e] mb-4">
                 <h3 className="font-bold text-base">Edit Team Details</h3>
                 <button
                   onClick={() => setEditingTeam(null)}
@@ -1508,7 +1508,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     required
                     value={editTeamName}
                     onChange={(e) => setEditTeamName(e.target.value)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <div>
@@ -1518,7 +1518,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     required
                     value={editLeaderName}
                     onChange={(e) => setEditLeaderName(e.target.value)}
-                    className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
 
@@ -1526,7 +1526,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setEditingTeam(null)}
-                    className="px-3 py-1.5 bg-[#202536] text-gray-300 rounded-lg text-xs"
+                    className="px-3 py-1.5 bg-[#22232c] text-gray-300 rounded-lg text-xs"
                   >
                     Cancel
                   </button>

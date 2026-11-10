@@ -52,7 +52,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
   return (
     <div className="space-y-5">
       {/* Tournament Overview Card */}
-      <div className="bg-[#141722] border border-[#24293a] rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#131419] border border-[#25262f] rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
@@ -69,7 +69,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="bg-[#0f121a] px-3.5 py-2 rounded-xl border border-[#262c3e] text-center">
+          <div className="bg-[#0d0e13] px-3.5 py-2 rounded-xl border border-[#282934] text-center">
             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Registered Teams</div>
             <div className="text-lg font-bold text-white">
               <span className="text-indigo-400">{teams.length}</span> / {tournament.maxTeams}
@@ -96,7 +96,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
             placeholder="Search teams or player IGN..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#10131d] border border-[#24293a] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full bg-[#0f1015] border border-[#25262f] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
           />
         </div>
 
@@ -107,7 +107,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
 
       {/* Teams Grid / List */}
       {filteredTeams.length === 0 ? (
-        <div className="bg-[#141722] border border-[#24293a] rounded-2xl p-10 text-center text-gray-400">
+        <div className="bg-[#131419] border border-[#25262f] rounded-2xl p-10 text-center text-gray-400">
           <Shield size={36} className="mx-auto mb-2.5 text-gray-600" />
           <h3 className="text-base font-bold text-white mb-0.5">No Teams Found</h3>
           <p className="text-xs">No registered squads match your search criteria.</p>
@@ -119,19 +119,19 @@ export const RegisteredTeamsView: React.FC<Props> = ({
             return (
               <div
                 key={team.id}
-                className="bg-[#141722] border border-[#24293a] hover:border-[#31384e] rounded-xl overflow-hidden transition-all"
+                className="bg-[#131419] border border-[#25262f] hover:border-[#2c2d38] rounded-xl overflow-hidden transition-all"
               >
                 {/* Main Row */}
                 <div
                   onClick={() => toggleExpand(team.id)}
-                  className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-[#181c2a] transition-colors"
+                  className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-[#1a1b23] transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     {team.teamLogo ? (
                       <img
                         src={team.teamLogo}
                         alt="Logo"
-                        className="w-9 h-9 rounded-lg object-cover border border-[#2d344a] shrink-0"
+                        className="w-9 h-9 rounded-lg object-cover border border-[#2c2d38] shrink-0"
                       />
                     ) : (
                       <div className="w-9 h-9 rounded-lg bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
@@ -155,7 +155,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
                     {/* Registration ID */}
                     <div
                       onClick={(e) => copyRegId(team.registrationId, e)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0f121a] hover:bg-[#161a25] border border-[#262c3e] rounded-lg text-xs font-mono text-indigo-300 transition-colors"
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0d0e13] hover:bg-[#17181f] border border-[#282934] rounded-lg text-xs font-mono text-indigo-300 transition-colors"
                       title="Copy ID"
                     >
                       <span>{team.registrationId}</span>
@@ -177,7 +177,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
 
                 {/* Expanded Full Squad Roster Details (IGNs only) */}
                 {isExpanded && (
-                  <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4 pt-2 border-t border-[#1f2434] bg-[#10131d]/60 animate-fade-in">
+                  <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4 pt-2 border-t border-[#20212a] bg-[#0f1015]/60 animate-fade-in">
                     <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5">
                       <Users size={13} className="text-indigo-400" />
                       Squad Players (In-Game Names)
@@ -195,7 +195,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
                                 ? 'bg-amber-500/5 border-amber-500/20 text-amber-200'
                                 : isLeader
                                 ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200'
-                                : 'bg-[#151926] border-[#252b3e] text-gray-200'
+                                : 'bg-[#15161d] border-[#2c2d38] text-gray-200'
                             }`}
                           >
                             <div className="text-[10px] uppercase font-bold text-gray-400">

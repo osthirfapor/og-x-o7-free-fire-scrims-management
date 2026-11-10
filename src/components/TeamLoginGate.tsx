@@ -115,7 +115,7 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
                 placeholder="Enter your team name"
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#0b0f18] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
+                className="w-full rounded-xl border border-white/10 bg-[#09090d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
               />
             </label>
             <label className="block">
@@ -128,14 +128,14 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
                 placeholder="Enter the registered leader IGN"
                 value={leaderName}
                 onChange={(event) => setLeaderName(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#0b0f18] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
+                className="w-full rounded-xl border border-white/10 bg-[#09090d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
               />
             </label>
 
             <button
               type="submit"
               disabled={saving || !teamName.trim() || !leaderName.trim()}
-              className="action-primary mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-900/30 transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
+              className="action-primary mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-ember-600 to-amber-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-900/30 transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
             >
               {saving ? <span className="loading-dots">Checking squad</span> : <>Enter the scrims hub <ArrowRight size={16} /></>}
             </button>

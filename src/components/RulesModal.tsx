@@ -8,10 +8,10 @@ interface Props {
 export const RulesModal: React.FC<Props> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-[#141722] border border-[#262c3e] rounded-2xl shadow-2xl p-6 sm:p-8 text-white max-h-[88vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-[#131419] border border-[#282934] rounded-2xl shadow-2xl p-6 sm:p-8 text-white max-h-[88vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#202536]"
+          className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#22232c]"
         >
           <X size={20} />
         </button>
@@ -27,23 +27,23 @@ export const RulesModal: React.FC<Props> = ({ onClose }) => {
         </div>
 
         <div className="space-y-4 text-xs text-gray-300">
-          <div className="bg-[#0f121a] p-4 rounded-xl border border-[#212638]">
+          <div className="bg-[#0d0e13] p-4 rounded-xl border border-[#23242e]">
             <h3 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
               <Trophy size={16} className="text-amber-400" /> Free Fire Standard Point System
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-1 font-mono">
-              <div className="p-2 bg-[#171b26] rounded-lg">1st: 12 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">2nd: 9 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">3rd: 8 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">4th: 7 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">5th: 6 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">6th: 5 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">7th: 4 pts</div>
-              <div className="p-2 bg-[#171b26] rounded-lg">Kill: 1 pt each</div>
+              <div className="p-2 bg-[#181920] rounded-lg">1st: 12 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">2nd: 9 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">3rd: 8 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">4th: 7 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">5th: 6 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">6th: 5 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">7th: 4 pts</div>
+              <div className="p-2 bg-[#181920] rounded-lg">Kill: 1 pt each</div>
             </div>
           </div>
 
-          <div className="bg-[#0f121a] p-4 rounded-xl border border-[#212638] space-y-2">
+          <div className="bg-[#0d0e13] p-4 rounded-xl border border-[#23242e] space-y-2">
             <h3 className="text-white font-bold text-sm flex items-center gap-2">
               <ShieldAlert size={16} className="text-indigo-400" /> Team & Player Rules
             </h3>

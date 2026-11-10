@@ -31,7 +31,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-3xl border border-[#262c3e] bg-gradient-to-br from-[#1a1f33] via-[#141722] to-[#1b1530] p-6 sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border border-[#282934] bg-gradient-to-br from-[#1d1a1a] via-[#131419] to-[#1b1530] p-6 sm:p-8">
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-10 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-5">
@@ -48,7 +48,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            className="bg-[#0d1017] border border-[#2b334a] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 max-w-full"
+            className="bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 max-w-full"
           >
             <option value="all">All Tournaments</option>
             {tournaments.map((t) => (
@@ -65,7 +65,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
             { label: 'Booyah Wins', value: totalWins, icon: <Crown size={16} className="text-amber-400" /> },
             { label: 'Teams Ranked', value: board.length, icon: <Flame size={16} className="text-rose-400" /> },
           ].map((s) => (
-            <div key={s.label} className="bg-[#0d1017]/70 border border-[#222839] rounded-2xl p-3.5 text-center">
+            <div key={s.label} className="bg-[#0b0c10]/70 border border-[#222839] rounded-2xl p-3.5 text-center">
               <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
                 {s.icon} {s.label}
               </div>
@@ -76,7 +76,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
       </div>
 
       {board.length === 0 ? (
-        <div className="bg-[#141722] border border-[#24293a] rounded-2xl p-12 text-center text-gray-400">
+        <div className="bg-[#131419] border border-[#25262f] rounded-2xl p-12 text-center text-gray-400">
           <Trophy size={40} className="mx-auto mb-3 text-gray-600" />
           <h3 className="text-base font-bold text-white mb-1">Ekhono kono result nei</h3>
           <p className="text-xs">Admin match result add korle ekhane winner & ranking dekha jabe.</p>
@@ -117,8 +117,8 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
             {/* Full table */}
-            <div className="xl:col-span-2 bg-[#141722] border border-[#24293a] rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#1f2434] text-xs font-bold uppercase tracking-wider text-gray-300">
+            <div className="xl:col-span-2 bg-[#131419] border border-[#25262f] rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#20212a] text-xs font-bold uppercase tracking-wider text-gray-300">
                 Full Ranking
               </div>
               <div className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3.5rem] gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
@@ -129,11 +129,11 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
                 <span className="text-center">Kills</span>
                 <span className="text-right">Points</span>
               </div>
-              <div className="divide-y divide-[#1b2030]">
+              <div className="divide-y divide-[#1e1f27]">
                 {board.map((t, i) => (
                   <div
                     key={t.teamName}
-                    className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3.5rem] gap-2 px-4 py-3 items-center text-xs hover:bg-[#181c2a] transition-colors"
+                    className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3.5rem] gap-2 px-4 py-3 items-center text-xs hover:bg-[#1a1b23] transition-colors"
                   >
                     <span
                       className={`font-black ${
@@ -153,7 +153,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
             </div>
 
             {/* Recent winners */}
-            <div className="bg-[#141722] border border-[#24293a] rounded-2xl p-4">
+            <div className="bg-[#131419] border border-[#25262f] rounded-2xl p-4">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300 mb-3">
                 <Target size={14} className="text-amber-400" /> Recent Match Winners
               </div>
@@ -162,7 +162,7 @@ export const LeaderboardView: React.FC<Props> = ({ results, tournaments }) => {
               ) : (
                 <div className="space-y-2">
                   {recentWinners.map((r) => (
-                    <div key={r.id} className="bg-[#0f121a] border border-[#1e2333] rounded-xl p-3">
+                    <div key={r.id} className="bg-[#0d0e13] border border-[#20212a] rounded-xl p-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-sm text-white truncate flex items-center gap-1.5">
                           <Crown size={13} className="text-amber-400 shrink-0" /> {r.teamName}

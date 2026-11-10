@@ -18,7 +18,7 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#6366f1', '#a855f7', '#ec4899', '#10b981', '#f59e0b'],
+        colors: ['#ff5f1a', '#f43f45', '#ffc61f', '#10b981', '#ffc61f'],
       });
     } catch (e) {
       // Ignored if canvas unsupported
@@ -39,11 +39,11 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-xl bg-[#161922] border border-[#262b3d] rounded-2xl shadow-2xl p-6 sm:p-7 text-white max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-[#161922] border border-[#2c2d38] rounded-2xl shadow-2xl p-6 sm:p-7 text-white max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#202536] transition-colors"
+          className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#22232c] transition-colors"
         >
           <X size={20} />
         </button>
@@ -81,7 +81,7 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
 
         {/* Team Details Summary */}
         <div className="space-y-4 mb-5">
-          <div className="grid grid-cols-2 gap-3 text-xs bg-[#12151f] p-3.5 rounded-xl border border-[#212638]">
+          <div className="grid grid-cols-2 gap-3 text-xs bg-[#121319] p-3.5 rounded-xl border border-[#23242e]">
             <div>
               <span className="text-gray-400">Team Name:</span>
               <p className="font-bold text-white text-sm mt-0.5">{team.teamName}</p>
@@ -106,9 +106,9 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
               <Users size={14} className="text-indigo-400" />
               Squad Players (In-Game Names)
             </div>
-            <div className="border border-[#212638] rounded-xl overflow-hidden divide-y divide-[#212638]">
+            <div className="border border-[#23242e] rounded-xl overflow-hidden divide-y divide-[#23242e]">
               {team.players.map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between px-3.5 py-2 bg-[#12151f] text-xs">
+                <div key={idx} className="flex items-center justify-between px-3.5 py-2 bg-[#121319] text-xs">
                   <div className="flex items-center gap-2.5">
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
@@ -149,10 +149,10 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         )}
 
         {/* Footer Actions */}
-        <div className="flex justify-end pt-3 border-t border-[#212638]">
+        <div className="flex justify-end pt-3 border-t border-[#23242e]">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[#202536] hover:bg-[#282f45] text-gray-200 hover:text-white rounded-xl text-xs font-semibold transition-colors"
+            className="px-4 py-2 bg-[#22232c] hover:bg-[#2c2d39] text-gray-200 hover:text-white rounded-xl text-xs font-semibold transition-colors"
           >
             Done
           </button>

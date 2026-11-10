@@ -1,5 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { Crown, DollarSign, Search, ShieldCheck, Swords, Trophy, Users } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ChevronDown,
+  Crown,
+  DollarSign,
+  Search,
+  Shield,
+  ShieldCheck,
+  Swords,
+  Target,
+  Trophy,
+  Users,
+  X,
+} from 'lucide-react';
 import { MatchResult, Team, Tournament } from '../types/tournament';
 
 interface Props {
@@ -8,24 +20,46 @@ interface Props {
   matchResults: MatchResult[];
 }
 
-interface PlayerDirectoryEntry {
-  playerName: string;
-  roles: Array<'main' | 'backup'>;
-  teams: string[];
-  registrations: number;
+interface SquadPlayer {
+  name: string;
+  role: 'main' | 'backup';
+  slotIndex: number;
   matches: number;
   wins: number;
+}
+
+interface Squad {
+  key: string;
+  teamName: string;
+  logo?: string;
+  leaderName: string;
+  players: SquadPlayer[];
+  matches: number;
+  wins: number;
+  kills: number;
+  points: number;
   earnings: number;
   tournaments: string[];
 }
 
+type SortMode = 'name' | 'points' | 'matches';
+
 const teamKey = (tournamentId: string, teamName: string) => `${tournamentId}:${teamName.trim().toLowerCase()}`;
+const pad = (value: number) => String(value).padStart(2, '0');
+const initials = (value: string) => value.trim().slice(0, 2).toUpperCase() || '??';
+
+const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
+  { id: 'name', label: 'A–Z' },
+  { id: 'points', label: 'Top points' },
+  { id: 'matches', label: 'Most matches' },
+];
 
 export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchResults }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'main' | 'backup'>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('name');
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
-  const players = useMemo(() => {
+  const squads = useMemo<Squad[]>(() => {
     const tournamentNames = new Map(tournaments.map((tournament) => [tournament.id, tournament.name]));
     const matchGroups = new Map<string, MatchResult[]>();
     matchResults.forEach((result) => {
@@ -33,84 +67,137 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
       matchGroups.set(key, [...(matchGroups.get(key) || []), result]);
     });
 
-    const directory = new Map<string, PlayerDirectoryEntry>();
-    const countedRegistrations = new Set<string>();
+    interface Draft extends Squad {
+      seenTournaments: Set<string>;
+      seenPlayerTournaments: Set<string>;
+      playerMap: Map<string, SquadPlayer>;
+    }
+    const drafts = new Map<string, Draft>();
 
-    teams.filter((team) => team.status === 'approved').forEach((team) => {
-      const registrationKey = `${team.tournamentId}:${team.id}`;
-      const teamMatches = matchGroups.get(teamKey(team.tournamentId, team.teamName)) || [];
-      const tournamentName = tournamentNames.get(team.tournamentId) || 'OG x o7 Scrims';
-
-      (team.players || []).forEach((player) => {
-        const playerKey = player.name.trim().toLowerCase();
-        if (!playerKey) return;
-        const entry = directory.get(playerKey) || {
-          playerName: player.name.trim(),
-          roles: [],
-          teams: [],
-          registrations: 0,
+    [...teams]
+      .filter((team) => team.status === 'approved')
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      .forEach((team) => {
+        const name = team.teamName.trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        const draft = drafts.get(key) || {
+          key,
+          teamName: name,
+          logo: undefined,
+          leaderName: '',
+          players: [],
           matches: 0,
           wins: 0,
+          kills: 0,
+          points: 0,
           earnings: 0,
           tournaments: [],
+          seenTournaments: new Set<string>(),
+          seenPlayerTournaments: new Set<string>(),
+          playerMap: new Map<string, SquadPlayer>(),
         };
 
-        if (!entry.roles.includes(player.role)) entry.roles.push(player.role);
-        if (!entry.teams.includes(team.teamName)) entry.teams.push(team.teamName);
-        if (!countedRegistrations.has(`${playerKey}:${registrationKey}`)) {
-          countedRegistrations.add(`${playerKey}:${registrationKey}`);
-          entry.registrations += 1;
-          entry.matches += teamMatches.length;
-          entry.wins += teamMatches.filter((match) => match.position === 1).length;
-          entry.earnings += teamMatches.reduce((sum, match) => sum + Math.max(0, Number(match.earnings) || 0), 0);
-        }
-        if (!entry.tournaments.includes(tournamentName)) entry.tournaments.push(tournamentName);
-        directory.set(playerKey, entry);
-      });
-    });
+        if (team.teamLogo) draft.logo = team.teamLogo;
+        if (team.leaderName) draft.leaderName = team.leaderName;
 
-    return Array.from(directory.values()).sort((a, b) =>
-      b.earnings - a.earnings || b.wins - a.wins || a.playerName.localeCompare(b.playerName)
-    );
+        const teamMatches = matchGroups.get(teamKey(team.tournamentId, team.teamName)) || [];
+        const teamWins = teamMatches.filter((match) => match.position === 1).length;
+        const tournamentName = tournamentNames.get(team.tournamentId) || 'OG x o7 Scrims';
+
+        if (!draft.seenTournaments.has(team.tournamentId)) {
+          draft.seenTournaments.add(team.tournamentId);
+          draft.matches += teamMatches.length;
+          draft.wins += teamWins;
+          draft.kills += teamMatches.reduce((sum, match) => sum + (Number(match.kills) || 0), 0);
+          draft.points += teamMatches.reduce((sum, match) => sum + (Number(match.points) || 0), 0);
+          draft.earnings += teamMatches.reduce((sum, match) => sum + Math.max(0, Number(match.earnings) || 0), 0);
+          if (!draft.tournaments.includes(tournamentName)) draft.tournaments.push(tournamentName);
+        }
+
+        (team.players || []).forEach((player) => {
+          const playerName = player.name.trim();
+          const playerKey = playerName.toLowerCase();
+          if (!playerKey) return;
+          const registrationKey = `${playerKey}:${team.tournamentId}`;
+          const entry = draft.playerMap.get(playerKey) || {
+            name: playerName,
+            role: player.role,
+            slotIndex: player.slotIndex ?? 99,
+            matches: 0,
+            wins: 0,
+          };
+          if (player.role === 'main') entry.role = 'main';
+          entry.slotIndex = Math.min(entry.slotIndex, player.slotIndex ?? 99);
+          // A player only gets credit once per tournament even if the squad was registered twice.
+          if (!draft.seenPlayerTournaments.has(registrationKey)) {
+            draft.seenPlayerTournaments.add(registrationKey);
+            entry.matches += teamMatches.length;
+            entry.wins += teamWins;
+          }
+          draft.playerMap.set(playerKey, entry);
+        });
+
+        drafts.set(key, draft);
+      });
+
+    return Array.from(drafts.values()).map(({ seenTournaments, seenPlayerTournaments, playerMap, ...squad }) => ({
+      ...squad,
+      players: Array.from(playerMap.values()).sort(
+        (a, b) => Number(a.role === 'backup') - Number(b.role === 'backup') || a.slotIndex - b.slotIndex || a.name.localeCompare(b.name),
+      ),
+    }));
   }, [teams, tournaments, matchResults]);
 
-  const filteredPlayers = useMemo(() => {
+  const visibleSquads = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return players.filter((player) => {
-      const matchesQuery = !query || player.playerName.toLowerCase().includes(query)
-        || player.teams.some((team) => team.toLowerCase().includes(query));
-      const matchesRole = roleFilter === 'all' || player.roles.includes(roleFilter);
-      return matchesQuery && matchesRole;
-    });
-  }, [players, searchTerm, roleFilter]);
+    const list = squads.filter((squad) => !query
+      || squad.teamName.toLowerCase().includes(query)
+      || squad.leaderName.toLowerCase().includes(query)
+      || squad.players.some((player) => player.name.toLowerCase().includes(query)));
 
-  const totalEarnings = players.reduce((sum, player) => sum + player.earnings, 0);
-  const totalWins = players.reduce((sum, player) => sum + player.wins, 0);
+    return [...list].sort((a, b) => {
+      if (sortMode === 'points') return b.points - a.points || b.wins - a.wins || a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
+      if (sortMode === 'matches') return b.matches - a.matches || b.wins - a.wins || a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
+      return a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [squads, searchTerm, sortMode]);
+
+  // A search that lands on exactly one squad opens it straight away.
+  useEffect(() => {
+    if (searchTerm.trim() && visibleSquads.length === 1) setOpenKey(visibleSquads[0].key);
+  }, [searchTerm, visibleSquads]);
+
+  const totalPlayers = squads.reduce((sum, squad) => sum + squad.players.length, 0);
+  const totalMatches = squads.reduce((sum, squad) => sum + squad.matches, 0);
+  const totalWins = squads.reduce((sum, squad) => sum + squad.wins, 0);
+  const query = searchTerm.trim().toLowerCase();
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-white/[.09] bg-gradient-to-br from-[#151b2a] via-[#10141e] to-[#121020] p-5 shadow-2xl shadow-black/20 sm:p-7">
-        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-indigo-500/15 blur-[90px]" />
-        <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-[90px]" />
+      <section className="squad-hero relative overflow-hidden rounded-3xl border border-white/[.08] p-5 shadow-2xl shadow-black/30 sm:p-7">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-ember-500/20 blur-[90px]" />
+        <div className="pointer-events-none absolute -bottom-32 left-1/4 h-64 w-64 rounded-full bg-cyan-400/10 blur-[90px]" />
         <div className="relative z-10 flex flex-col justify-between gap-6 xl:flex-row xl:items-end">
           <div className="max-w-2xl">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">
-              <Search size={14} /> Competitive intelligence
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-ember-300">
+              <span className="h-px w-6 bg-gradient-to-r from-ember-400 to-amber-300" /> Squad roster
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Player directory</h2>
-            <p className="mt-1.5 text-xs leading-5 text-slate-400 sm:text-sm">
-              Search any registered IGN to see squad history, match form, Booyahs and team prize earnings.
+            <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Teams &amp; players</h2>
+            <p className="mt-1.5 text-xs leading-5 text-zinc-400 sm:text-sm">
+              Tap any squad to open its roster and see how many matches every player has played.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             {[
-              { label: 'Players', value: players.length, icon: <Users size={14} className="text-indigo-300" /> },
-              { label: 'Booyahs', value: totalWins, icon: <Crown size={14} className="text-amber-300" /> },
-              { label: 'Team earnings', value: `৳${totalEarnings.toLocaleString()}`, icon: <DollarSign size={14} className="text-emerald-300" /> },
+              { label: 'Teams', value: squads.length, icon: <Shield size={14} className="text-ember-300" /> },
+              { label: 'Players', value: totalPlayers, icon: <Users size={14} className="text-cyan-300" /> },
+              { label: 'Matches', value: totalMatches, icon: <Swords size={14} className="text-amber-300" /> },
+              { label: 'Booyahs', value: totalWins, icon: <Crown size={14} className="text-yellow-300" /> },
             ].map((stat) => (
-              <div key={stat.label} className="stat-tile min-w-[92px] rounded-2xl border border-white/[.07] bg-black/20 px-3 py-2.5 sm:min-w-[112px] sm:px-4">
-                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">{stat.icon}{stat.label}</div>
-                <div className="mt-1 text-lg font-black tracking-tight text-white sm:text-xl">{stat.value}</div>
+              <div key={stat.label} className="stat-tile min-w-[92px] rounded-2xl border border-white/[.07] bg-black/30 px-3 py-2.5 sm:px-4">
+                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">{stat.icon}{stat.label}</div>
+                <div className="mt-1 text-lg font-black tabular-nums tracking-tight text-white sm:text-xl">{stat.value}</div>
               </div>
             ))}
           </div>
@@ -118,95 +205,166 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
 
         <div className="relative z-10 mt-6 flex flex-col gap-3 lg:flex-row">
           <label className="search-field relative flex-1">
-            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="search"
-              aria-label="Search player or team"
-              placeholder="Search player IGN or team name…"
+              aria-label="Search team or player"
+              placeholder="Search team or player IGN…"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#090d15]/80 py-3.5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/50 focus:ring-4 focus:ring-indigo-500/10"
+              className="w-full rounded-2xl border border-white/10 bg-[#07080b]/80 py-3.5 pl-11 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-ember-400/60 focus:ring-4 focus:ring-ember-500/10"
             />
+            {searchTerm && (
+              <button type="button" aria-label="Clear search" onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white">
+                <X size={15} />
+              </button>
+            )}
           </label>
-          <div className="flex items-center gap-1 rounded-2xl border border-white/[.07] bg-black/20 p-1">
-            {[
-              { id: 'all', label: `All · ${players.length}` },
-              { id: 'main', label: 'Main' },
-              { id: 'backup', label: 'Backup' },
-            ].map((filter) => (
+          <div className="flex items-center gap-1 rounded-2xl border border-white/[.07] bg-black/30 p-1" role="group" aria-label="Sort teams">
+            {SORT_OPTIONS.map((option) => (
               <button
-                key={filter.id}
+                key={option.id}
                 type="button"
-                onClick={() => setRoleFilter(filter.id as typeof roleFilter)}
-                className={`rounded-xl px-3 py-2 text-[11px] font-bold transition-all ${roleFilter === filter.id ? 'bg-indigo-500 text-white shadow-md shadow-indigo-950/40' : 'text-slate-500 hover:text-white'}`}
+                onClick={() => setSortMode(option.id)}
+                className={`rounded-xl px-3 py-2 text-[11px] font-bold transition-all ${sortMode === option.id ? 'bg-gradient-to-r from-ember-600 to-amber-500 text-white shadow-md shadow-ember-950/50' : 'text-zinc-500 hover:text-white'}`}
               >
-                {filter.label}
+                {option.label}
               </button>
             ))}
           </div>
         </div>
       </section>
 
-      <div className="flex items-center justify-between px-1 text-[11px] text-slate-500">
-        <span><strong className="text-slate-200">{filteredPlayers.length}</strong> player records · {teams.filter((team) => team.status === 'approved').length} approved squad registrations</span>
-        {searchTerm && <button type="button" onClick={() => setSearchTerm('')} className="font-semibold text-indigo-300 hover:text-white">Clear search</button>}
+      <div className="flex items-center justify-between px-1 text-[11px] text-zinc-500">
+        <span><strong className="text-zinc-200">{visibleSquads.length}</strong> {visibleSquads.length === 1 ? 'team' : 'teams'} listed</span>
+        {openKey && <button type="button" onClick={() => setOpenKey(null)} className="font-semibold text-ember-300 hover:text-white">Collapse all</button>}
       </div>
 
-      {filteredPlayers.length === 0 ? (
-        <div className="empty-state rounded-3xl border border-white/[.07] bg-[#111621]/90 px-6 py-14 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-300/10 bg-indigo-300/[.07] text-indigo-200"><Users size={25} /></div>
-          <h3 className="font-bold text-white">{players.length ? 'No player matched that search' : 'Player stats are warming up'}</h3>
-          <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-slate-500">
-            {players.length ? 'Try another IGN or team name.' : 'Approved registrations appear here. Match and earnings numbers update as organizers add results.'}
+      {visibleSquads.length === 0 ? (
+        <div className="empty-state rounded-3xl border border-white/[.07] bg-[#111218]/90 px-6 py-14 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-ember-300/10 bg-ember-300/[.07] text-ember-200"><Users size={25} /></div>
+          <h3 className="font-bold text-white">{squads.length ? 'No team or player matched that search' : 'Squads are warming up'}</h3>
+          <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-zinc-500">
+            {squads.length ? 'Try another team name or player IGN.' : 'Approved squads appear here. Match numbers update as organizers add results.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 2xl:grid-cols-3">
-          {filteredPlayers.map((player, index) => (
-            <article key={player.playerName.toLowerCase()} className="player-card group relative overflow-hidden rounded-2xl border border-white/[.08] bg-gradient-to-br from-[#151a27] to-[#0f131c] p-4 transition duration-300 hover:-translate-y-1 hover:border-indigo-300/30 hover:shadow-xl hover:shadow-indigo-950/25" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}>
-              <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-indigo-500/[.06] blur-2xl transition group-hover:bg-indigo-400/[.14]" />
-              <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="player-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/15 bg-gradient-to-br from-indigo-500/20 to-cyan-300/10 text-sm font-black text-indigo-100">
-                    {player.playerName.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="truncate font-extrabold text-white transition-colors group-hover:text-cyan-100">{player.playerName}</h3>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {player.roles.map((role) => (
-                        <span key={role} className={`rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${role === 'backup' ? 'border-amber-300/15 bg-amber-300/[.06] text-amber-200' : 'border-indigo-300/15 bg-indigo-300/[.06] text-indigo-200'}`}>{role}</span>
-                      ))}
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-300"><ShieldCheck size={11} /> Verified</span>
+        <ol className="space-y-2.5">
+          {visibleSquads.map((squad, index) => {
+            const open = openKey === squad.key;
+            const mainCount = squad.players.filter((player) => player.role === 'main').length;
+            const backupCount = squad.players.length - mainCount;
+            const panelId = `squad-panel-${squad.key.replace(/[^a-z0-9]+/g, '-')}-${index}`;
+
+            return (
+              <li
+                key={squad.key}
+                data-open={open}
+                className="squad-row group relative overflow-hidden rounded-2xl"
+                style={{ ['--i' as string]: Math.min(index, 12) } as React.CSSProperties}
+              >
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => setOpenKey(open ? null : squad.key)}
+                  className="relative z-10 flex w-full items-center gap-3 px-3.5 py-3 text-left sm:gap-4 sm:px-4 sm:py-3.5"
+                >
+                  <span className="squad-serial flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black tabular-nums sm:h-11 sm:w-11">
+                    {pad(index + 1)}
+                  </span>
+
+                  <span className="squad-logo flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl text-xs font-black text-ember-100 sm:h-11 sm:w-11">
+                    {squad.logo ? <img src={squad.logo} alt="" className="h-full w-full object-cover" /> : initials(squad.teamName)}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-[15px] font-extrabold tracking-tight text-white transition-colors group-hover:text-ember-100 sm:text-base">{squad.teamName}</span>
+                      <ShieldCheck size={13} className="hidden shrink-0 text-emerald-300 sm:block" aria-label="Verified" />
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
+                      {mainCount} main{backupCount ? ` · ${backupCount} backup` : ''}{squad.leaderName ? ` · Leader ${squad.leaderName}` : ''}
+                    </span>
+                  </span>
+
+                  <span className="hidden items-center gap-2 sm:flex">
+                    <span className="squad-chip"><Swords size={12} className="text-cyan-300" />{squad.matches}<em>{squad.matches === 1 ? 'match' : 'matches'}</em></span>
+                    <span className="squad-chip"><Crown size={12} className="text-yellow-300" />{squad.wins}<em>{squad.wins === 1 ? 'win' : 'wins'}</em></span>
+                  </span>
+
+                  <ChevronDown size={18} className={`shrink-0 text-zinc-500 transition-transform duration-500 ease-out ${open ? 'rotate-180 text-ember-300' : ''}`} />
+                </button>
+
+                <div id={panelId} className="squad-panel relative z-10" inert={!open}>
+                  <div className="squad-panel-inner">
+                    <div className="px-3.5 pb-4 sm:px-4">
+                      <div className="grid grid-cols-2 gap-2 border-t border-white/[.06] pt-4 sm:grid-cols-5">
+                        {[
+                          { label: 'Matches', value: squad.matches, icon: <Swords size={13} className="text-cyan-300" /> },
+                          { label: 'Booyahs', value: squad.wins, icon: <Crown size={13} className="text-yellow-300" /> },
+                          { label: 'Kills', value: squad.kills, icon: <Target size={13} className="text-rose-300" /> },
+                          { label: 'Points', value: squad.points, icon: <Trophy size={13} className="text-ember-300" /> },
+                          { label: 'Earnings*', value: `৳${squad.earnings.toLocaleString()}`, icon: <DollarSign size={13} className="text-emerald-300" /> },
+                        ].map((stat, statIndex, all) => (
+                          <div key={stat.label} className={`rounded-xl border border-white/[.05] bg-black/25 px-3 py-2.5 ${statIndex === all.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
+                            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">{stat.icon}{stat.label}</div>
+                            <div className="mt-1 truncate text-lg font-black tabular-nums text-white">{stat.value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-500">
+                        <span>Roster</span>
+                        <span>Matches played</span>
+                      </div>
+
+                      <ul className="mt-2 space-y-1.5">
+                        {squad.players.map((player, playerIndex) => {
+                          const ratio = squad.matches > 0 ? Math.min(1, player.matches / squad.matches) : 0;
+                          const hit = Boolean(query) && player.name.toLowerCase().includes(query);
+                          return (
+                            <li
+                              key={player.name}
+                              className={`squad-player flex items-center gap-3 rounded-xl border px-3 py-2.5 ${hit ? 'border-ember-400/50 bg-ember-500/10' : 'border-white/[.05] bg-white/[.025]'}`}
+                              style={{ ['--d' as string]: playerIndex } as React.CSSProperties}
+                            >
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-black/40 text-[10px] font-black tabular-nums text-zinc-500">{playerIndex + 1}</span>
+                              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ${player.role === 'backup' ? 'bg-amber-400/10 text-amber-200' : 'bg-ember-500/15 text-ember-200'}`}>{initials(player.name)}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="truncate text-sm font-bold text-white">{player.name}</span>
+                                  <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${player.role === 'backup' ? 'border-amber-300/20 bg-amber-300/[.07] text-amber-200' : 'border-ember-300/20 bg-ember-300/[.07] text-ember-200'}`}>{player.role}</span>
+                                </div>
+                                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/40">
+                                  <div className="squad-bar-fill h-full rounded-full bg-gradient-to-r from-ember-500 via-amber-400 to-yellow-300" style={{ width: `${Math.max(ratio * 100, player.matches > 0 ? 6 : 0)}%` }} />
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <div className="text-base font-black leading-none tabular-nums text-white">{player.matches}</div>
+                                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">{player.matches === 1 ? 'match' : 'matches'}</div>
+                              </div>
+                              <div className="hidden w-12 shrink-0 text-right sm:block">
+                                <div className="flex items-center justify-end gap-1 text-sm font-black leading-none tabular-nums text-yellow-300"><Crown size={11} />{player.wins}</div>
+                                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">{player.wins === 1 ? 'win' : 'wins'}</div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[10px] text-zinc-500">
+                        {squad.tournaments.slice(0, 4).map((name) => <span key={name} className="rounded-md border border-white/[.06] bg-white/[.03] px-2 py-0.5 text-zinc-400">{name}</span>)}
+                        {squad.tournaments.length > 4 && <span>+{squad.tournaments.length - 4} more</span>}
+                        <span className="ml-auto text-zinc-600">*Shared prize money recorded for this squad.</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <Trophy size={15} className="mt-1 shrink-0 text-amber-300/70" />
-              </div>
-
-              <div className="relative z-10 mt-4 flex min-h-7 flex-wrap gap-1.5">
-                {player.teams.slice(0, 3).map((team) => <span key={team} className="max-w-full truncate rounded-lg border border-white/[.07] bg-white/[.035] px-2 py-1 text-[10px] font-semibold text-slate-300">{team}</span>)}
-                {player.teams.length > 3 && <span className="rounded-lg bg-white/[.035] px-2 py-1 text-[10px] text-slate-500">+{player.teams.length - 3}</span>}
-              </div>
-
-              <div className="relative z-10 mt-4 grid grid-cols-4 gap-1.5 border-t border-white/[.06] pt-3">
-                {[
-                  { label: 'Registered', value: player.registrations, icon: <Users size={12} className="text-indigo-300" /> },
-                  { label: 'Matches', value: player.matches, icon: <Swords size={12} className="text-cyan-300" /> },
-                  { label: 'Wins', value: player.wins, icon: <Crown size={12} className="text-amber-300" /> },
-                  { label: 'Earnings*', value: `৳${player.earnings.toLocaleString()}`, icon: <DollarSign size={12} className="text-emerald-300" /> },
-                ].map((stat) => (
-                  <div key={stat.label} className="min-w-0 rounded-xl bg-black/20 px-1.5 py-2 text-center">
-                    <div className="flex items-center justify-center">{stat.icon}</div>
-                    <div className="mt-1 truncate text-sm font-black text-white">{stat.value}</div>
-                    <div className="truncate text-[8px] font-bold uppercase tracking-wide text-slate-600">{stat.label}</div>
-                  </div>
-                ))}
-              </div>
-              <p className="relative z-10 mt-2 text-[9px] text-slate-600">*Shared total prize money recorded for listed squads.</p>
-              <div className="relative z-10 mt-2 truncate text-[10px] text-slate-500">{player.tournaments.slice(0, 2).join(' · ')}{player.tournaments.length > 2 ? ` · +${player.tournaments.length - 2} more` : ''}</div>
-            </article>
-          ))}
-        </div>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </div>
   );
