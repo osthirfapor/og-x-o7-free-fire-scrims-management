@@ -14,6 +14,13 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    match /banned_teams/{banId} {
+      // Public registration checks a known normalized team-name key.
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /test/{docId} {
       allow read: if true;
       allow write: if false;
@@ -60,7 +67,19 @@ service cloud.firestore {
     }
 
     match /registration_logs/{logId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      // One public audit entry per real registration; its fields must match the
+      // already-created team, and clients cannot edit or remove it afterwards.
+      allow create: if isAdmin() || (
+        request.auth == null
+        && request.resource.data.teamId is string
+        && logId == request.resource.data.teamId
+        && exists(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)/teams/$(request.resource.data.teamId))
+        && get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)/teams/$(request.resource.data.teamId)).data.registrationId == request.resource.data.registrationId
+        && get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)/teams/$(request.resource.data.teamId)).data.teamName == request.resource.data.teamName
+        && get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)/teams/$(request.resource.data.teamId)).data.leaderName == request.resource.data.leaderName
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /{document=**} {

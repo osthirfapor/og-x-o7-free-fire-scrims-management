@@ -23,6 +23,8 @@ import {
   Calendar,
   Sparkles,
   LogOut,
+  Wallet,
+  X as CloseIcon,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -89,6 +91,7 @@ function MainApp() {
   // Modals
   const [showRegModal, setShowRegModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
   const [isAdminPage, setIsAdminPage] = useState(() => ADMIN_PANEL_ENABLED && new URLSearchParams(window.location.search).get('panel') === 'admin');
   const handledRegistrationLink = useRef(false);
@@ -237,6 +240,10 @@ function MainApp() {
 
   // Real leaderboard built from admin-entered match results
   const leaderboard = useMemo(() => buildLeaderboard(matchResults), [matchResults]);
+  const walletEntries = useMemo(() => matchResults
+    .filter((result) => result.teamName.trim().toLocaleLowerCase() === teamProfile?.teamName.trim().toLocaleLowerCase() && Number(result.earnings) > 0)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [matchResults, teamProfile?.teamName]);
+  const walletTotal = walletEntries.reduce((sum, result) => sum + (Number(result.earnings) || 0), 0);
   const myStanding = useMemo(() => {
     if (!teamProfile) return null;
     const idx = leaderboard.findIndex(
@@ -471,6 +478,9 @@ function MainApp() {
               </span>
               <span className="max-w-[160px] truncate font-semibold text-slate-200">{teamProfile.teamName}</span>
             </div>
+            <button type="button" onClick={() => setShowWallet(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/15 bg-amber-300/[.06] px-3 py-2 text-xs font-bold text-amber-100 transition hover:border-amber-300/35 hover:bg-amber-300/10" title="View tournament prize earnings">
+              <Wallet size={15} /> <span className="hidden sm:inline">Wallet</span>
+            </button>
             <button
               onClick={handleLogoutTeam}
               className="rounded-xl border border-white/5 p-2 text-slate-400 transition-all hover:border-rose-400/20 hover:bg-rose-400/10 hover:text-rose-300"
@@ -479,16 +489,6 @@ function MainApp() {
             >
               <LogOut size={16} />
             </button>
-            {!PUBLIC_READ_ONLY && (
-              <>
-                <button
-                  onClick={() => handleOpenRegistration(activeTournament || undefined)}
-                  className="action-primary shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/25"
-                >
-                  Register Team
-                </button>
-              </>
-            )}
           </div>
         </header>
 
@@ -644,6 +644,7 @@ function MainApp() {
                             <div className="text-[10px] text-gray-400">
                               {tour.date} ({tour.time})
                             </div>
+                            {tour.category === 'paid' && tour.entryFee && <div className="mt-1 text-[10px] font-extrabold text-amber-200">Entry ৳{Number(tour.entryFee).toLocaleString()} / team</div>}
                           </div>
 
                           {/* Bottom Area: Prominent Title & Action (Matching image reference) */}
@@ -798,6 +799,28 @@ function MainApp() {
       </div>
 
       {/* ================= MODALS ================= */}
+      {showWallet && teamProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowWallet(false)}>
+          <section className="wallet-card w-full max-w-lg overflow-hidden rounded-3xl border border-amber-200/15 bg-[#111218] text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <header className="flex items-center justify-between border-b border-white/[.07] px-5 py-4">
+              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-300/10 text-amber-200"><Wallet size={20} /></span><div><h2 className="font-bold">Team Wallet</h2><p className="text-[11px] text-slate-400">Prize earnings recorded by the organizer</p></div></div>
+              <button type="button" onClick={() => setShowWallet(false)} aria-label="Close wallet" className="rounded-lg p-2 text-slate-400 hover:bg-white/[.06] hover:text-white"><CloseIcon size={17} /></button>
+            </header>
+            <div className="p-5">
+              <div className="rounded-2xl border border-amber-300/15 bg-gradient-to-br from-amber-300/[.1] to-orange-500/[.03] p-5">
+                <div className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-100/60">Total prize earnings</div>
+                <div className="mt-2 text-3xl font-black text-amber-100">৳{walletTotal.toLocaleString()}</div>
+                <div className="mt-1 text-[10px] text-slate-500">This is a record of results, not a withdrawable balance.</div>
+              </div>
+              <div className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400">Recent earnings</div>
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                {walletEntries.length ? walletEntries.map((result) => <div key={result.id} className="flex items-center justify-between rounded-xl border border-white/[.06] bg-white/[.025] px-3.5 py-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-white">{result.tournamentName}</div><div className="mt-1 text-[10px] text-slate-500">{result.createdAt ? new Date(result.createdAt).toLocaleDateString() : '—'}</div></div><div className="ml-3 text-sm font-extrabold text-emerald-300">+৳{Number(result.earnings).toLocaleString()}</div></div>) : <div className="rounded-xl border border-dashed border-white/[.08] py-7 text-center text-xs text-slate-500">No prize earnings recorded yet.</div>}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
       {/* 1. Team Registration Modal (Auto-refilled, No tournament dropdown selector) */}
       {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (
         <RegistrationModal

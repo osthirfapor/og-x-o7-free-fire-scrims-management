@@ -25,7 +25,7 @@ export interface Team {
   leaderName: string;
   players: Player[];
   playerNames: string[];
-  status: 'approved' | 'pending' | 'rejected';
+  status: 'approved' | 'pending' | 'rejected' | 'banned';
   createdAt: string;
   updatedAt?: string;
 }

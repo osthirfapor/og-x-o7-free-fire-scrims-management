@@ -22,6 +22,8 @@ import {
   Trophy,
   Crown,
   Copy,
+  Ban,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Tournament, Team, RegistrationLog, Player, MatchResult } from '../types/tournament';
@@ -36,6 +38,7 @@ import {
   subscribeMatchResults,
   addMatchResult,
   deleteMatchResult,
+  setTeamBanned,
   calcPoints,
   buildLeaderboard,
 } from '../services/tournamentService';
@@ -78,6 +81,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourDate, setTourDate] = useState(currentTour.date);
   const [tourTime, setTourTime] = useState(currentTour.time);
   const [tourMaxTeams, setTourMaxTeams] = useState(currentTour.maxTeams);
+  const [tourEntryFee, setTourEntryFee] = useState(currentTour.entryFee || '');
   const [tourStatus, setTourStatus] = useState(currentTour.status);
   const [tourMap, setTourMap] = useState(currentTour.map || 'Bermuda');
   const [tourCardImage, setTourCardImage] = useState(currentTour.cardImageUrl || '');
@@ -99,6 +103,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourMax, setNewTourMax] = useState(12);
   const [newTourMap, setNewTourMap] = useState<string[]>(['Bermuda']);
   const [newTourCategory, setNewTourCategory] = useState<'practice' | 'free' | 'paid'>('practice');
+  const [newTourEntryFee, setNewTourEntryFee] = useState('');
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
   const [newTourCardImage, setNewTourCardImage] = useState('');
 
@@ -136,6 +141,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourDate(activeTournament.date);
     setTourTime(activeTournament.time);
     setTourMaxTeams(activeTournament.maxTeams);
+    setTourEntryFee(activeTournament.entryFee || '');
     setTourStatus(activeTournament.status);
     setTourMap(activeTournament.map || 'Bermuda');
     setTourCardImage(activeTournament.cardImageUrl || '');
@@ -193,6 +199,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourDate(tour.date);
     setTourTime(tour.time);
     setTourMaxTeams(tour.maxTeams);
+    setTourEntryFee(tour.entryFee || '');
     setTourStatus(tour.status);
     setTourMap(tour.map || 'Bermuda');
     setTourCardImage(tour.cardImageUrl || '');
@@ -240,6 +247,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         date: tourDate,
         time: tourTime,
         maxTeams: Number(tourMaxTeams),
+        entryFee: currentTour.category === 'paid' ? tourEntryFee.trim() : '',
         status: tourStatus,
         map: tourMap,
         cardImageUrl: tourCardImage.trim(),
@@ -291,6 +299,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       const newId = await createTournament({
         name: newTourName.trim(),
         category: newTourCategory,
+        entryFee: newTourCategory === 'paid' ? newTourEntryFee.trim() : '',
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
         maxTeams: Number(newTourMax) || 12,
@@ -304,6 +313,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       setTab('overview');
       setShowCreateTour(false);
       setNewTourName('');
+      setNewTourEntryFee('');
       setNewTourGroupLink('');
       setNewTourCardImage('');
       setNewTourMap(['Bermuda']);
@@ -325,10 +335,13 @@ export const AdminPanelModal: React.FC<Props> = ({
   };
 
   // Team Actions: Approve / Reject
-  const handleTeamStatus = async (team: Team, nextStatus: 'approved' | 'rejected' | 'pending') => {
+  const handleTeamStatus = async (team: Team, nextStatus: 'approved' | 'rejected' | 'pending' | 'banned') => {
     try {
+      if (nextStatus === 'banned') await setTeamBanned(team.teamName, true);
+      if (team.status === 'banned' && nextStatus !== 'banned') await setTeamBanned(team.teamName, false);
       await updateTeam(team.tournamentId, team.id, { status: nextStatus });
     } catch (err: any) {
+      if (nextStatus === 'banned') await setTeamBanned(team.teamName, false).catch(() => undefined);
       alert(`Failed to update team: ${err.message}`);
     }
   };
@@ -606,68 +619,29 @@ export const AdminPanelModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Admin Tabs */}
-            <div className="flex items-center gap-2 border-b border-[#23242e] pb-2 overflow-x-auto text-xs">
-              <button
-                onClick={() => setTab('overview')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'overview' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setTab('teams')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'teams' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Registered Teams ({currentTourTeams.length})
-              </button>
-              <button
-                onClick={() => setTab('results')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'results' ? 'bg-amber-600 text-white' : 'text-amber-300/80 hover:text-white'
-                }`}
-              >
-                🏆 Results & Ranking ({tourResults.length})
-              </button>
-              <button
-                onClick={() => setTab('tournament')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'tournament' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Tournament Info & Slots
-              </button>
-              <button
-                onClick={() => setTab('redirect')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'redirect' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Redirect Link
-              </button>
-              <button
-                onClick={() => setTab('discord')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'discord' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Discord Webhook Relay
-              </button>
-              <button
-                onClick={() => setTab('logs')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors shrink-0 ${
-                  tab === 'logs' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Registration Logs ({logs.length})
-              </button>
-            </div>
+            <div className="admin-workspace mt-4 flex min-h-0 flex-1 gap-4">
+              <aside className="admin-sidebar flex w-52 shrink-0 flex-col gap-1 border-r border-[#23242e] pr-3">
+                {[
+                  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+                  { id: 'teams', label: `Registered Teams (${currentTourTeams.length})`, icon: Users },
+                  { id: 'results', label: `Results & Ranking (${tourResults.length})`, icon: Trophy },
+                  { id: 'tournament', label: 'Tournament Info', icon: Sliders },
+                  { id: 'redirect', label: 'CG Group Link', icon: Link },
+                  { id: 'discord', label: 'Discord Relay', icon: Send },
+                  { id: 'logs', label: `Activity Logs (${logs.length})`, icon: ListFilter },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button key={item.id} type="button" title={item.label} onClick={() => setTab(item.id as typeof tab)} className={`admin-side-link flex items-center gap-2.5 rounded-xl px-3 py-3 text-left text-xs font-bold transition-all ${tab === item.id ? 'is-active' : 'text-slate-400 hover:bg-white/[.04] hover:text-white'}`}>
+                      <Icon size={15} className="shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </aside>
 
-            {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto mt-4 pr-1">
+              {/* TAB CONTENT */}
+              <div key={tab} className="admin-tab-panel min-h-0 flex-1 overflow-y-auto pr-1">
               {/* TAB 1: OVERVIEW */}
               {tab === 'overview' && (
                 <div className="space-y-5">
@@ -822,7 +796,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
                                   team.status === 'approved'
                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                    : team.status === 'rejected'
+                                    : team.status === 'rejected' || team.status === 'banned'
                                     ? 'bg-red-500/10 text-red-400 border-red-500/20'
                                     : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                 }`}
@@ -855,7 +829,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 Approve
                               </button>
                             )}
-                            {team.status !== 'rejected' && (
+                            {team.status !== 'rejected' && team.status !== 'banned' && (
                               <button
                                 onClick={() => handleTeamStatus(team, 'rejected')}
                                 className="px-2.5 py-1 text-xs font-semibold bg-red-600/20 text-red-300 border border-red-500/30 rounded-lg hover:bg-red-600/30"
@@ -863,6 +837,17 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 Reject
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (team.status === 'banned') void handleTeamStatus(team, 'rejected');
+                                else if (confirm(`Ban ${team.teamName}? This blocks the team from future registrations.`)) void handleTeamStatus(team, 'banned');
+                              }}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold ${team.status === 'banned' ? 'border-emerald-500/30 bg-emerald-600/15 text-emerald-300' : 'border-rose-500/30 bg-rose-600/15 text-rose-300 hover:bg-rose-600/25'}`}
+                              title={team.status === 'banned' ? 'Unban this team' : 'Ban this team from future registrations'}
+                            >
+                              <Ban size={13} /> {team.status === 'banned' ? 'Unban' : 'Ban'}
+                            </button>
                             <button
                               onClick={() => {
                                 setEditingTeam(team);
@@ -1146,6 +1131,13 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
                   </div>
 
+                  {currentTour.category === 'paid' && (
+                    <div className="max-w-xs">
+                      <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Entry Fee per Team (BDT)</label>
+                      <input type="number" min="1" step="1" value={tourEntryFee} onChange={(event) => setTourEntryFee(event.target.value)} placeholder="e.g. 100" className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white" />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">
                       Square Card Background Image URL
@@ -1330,6 +1322,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         >
                           <div>
                             <div className="flex items-center gap-2">
+                              <span className="rounded border border-indigo-400/15 bg-indigo-400/[.07] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-200">Team registration</span>
                               <span className="font-mono text-indigo-400 font-bold">{log.registrationId}</span>
                               <span className="font-bold text-white">{log.teamName}</span>
                               <span className="text-gray-400">({log.tournamentName})</span>
@@ -1340,8 +1333,8 @@ export const AdminPanelModal: React.FC<Props> = ({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              DISPATCHED
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${log.discordDelivered ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-300 border-rose-500/20'}`}>
+                              {log.discordDelivered ? 'DISCORD SENT' : 'DISCORD FAILED'}
                             </span>
                             <div className="text-[10px] text-gray-500 mt-0.5">
                               {new Date(log.createdAt).toLocaleTimeString()}
@@ -1353,6 +1346,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   )}
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -1447,6 +1441,13 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <option value="paid">Paid Scrims</option>
                   </select>
                 </div>
+
+                {newTourCategory === 'paid' && (
+                  <div className="animate-fade-in">
+                    <label className="block text-xs text-gray-400 mb-1">Entry fee per team (BDT) *</label>
+                    <input type="number" required min="1" step="1" value={newTourEntryFee} onChange={(event) => setNewTourEntryFee(event.target.value)} placeholder="e.g. 100" className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white" />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">CG Group Invite Link</label>

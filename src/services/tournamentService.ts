@@ -23,6 +23,29 @@ export function generateRegistrationId(): string {
   return `OG7-FF-${rand}`;
 }
 
+function teamBanDocId(teamName: string): string {
+  return encodeURIComponent(teamName.trim().toLocaleLowerCase().replace(/\s+/g, ' '));
+}
+
+export async function isTeamNameBanned(teamName: string): Promise<boolean> {
+  const snapshot = await getDoc(doc(db, 'banned_teams', teamBanDocId(teamName)));
+  return snapshot.exists() && snapshot.data().enabled === true;
+}
+
+export async function setTeamBanned(teamName: string, enabled: boolean): Promise<void> {
+  const banRef = doc(db, 'banned_teams', teamBanDocId(teamName));
+  if (enabled) {
+    await setDoc(banRef, {
+      teamName: teamName.trim(),
+      normalizedName: teamName.trim().toLocaleLowerCase().replace(/\s+/g, ' '),
+      enabled: true,
+      updatedAt: new Date().toISOString(),
+    });
+  } else {
+    await deleteDoc(banRef);
+  }
+}
+
 // 1. Subscribe to Tournaments list
 export function subscribeTournaments(
   onData: (tournaments: Tournament[]) => void,
@@ -90,6 +113,7 @@ export async function registerTeam(params: {
 
   // Basic validation
   if (!teamName.trim()) throw new Error('Enter a team name.');
+  if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registering. Contact the organizer.');
   if (!teamLogo?.trim()) throw new Error('Upload a team logo image.');
   const isUploadedLogo = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(teamLogo);
   let isRemoteLogo = false;
@@ -206,9 +230,10 @@ export async function registerTeam(params: {
   });
 
   // Relay registration to Discord securely via server-side API
+  let discordDelivered = false;
   try {
     const notifyUrl = typeof window !== 'undefined' ? '/api/discord-notify' : 'http://localhost:3000/api/discord-notify';
-    fetch(notifyUrl, {
+    const notificationResponse = await fetch(notifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -223,16 +248,20 @@ export async function registerTeam(params: {
         remainingSlots: resultTeam.remainingSlots,
         tournamentName: tournament.name,
       }),
-    }).catch((e) => console.error('Failed to trigger Discord relay:', e));
+    });
+    const notificationResult = await notificationResponse.json().catch(() => ({}));
+    discordDelivered = notificationResponse.ok && notificationResult.delivered === true;
+    if (!discordDelivered) console.warn('Discord relay returned an error:', notificationResponse.status);
   } catch (err) {
     console.error('Error in Discord relay call:', err);
   }
 
   // Record audit log
   try {
-    const logId = `log_${Date.now()}`;
+    const logId = resultTeam.newTeam.id;
     await setDoc(doc(db, 'registration_logs', logId), {
       id: logId,
+      teamId: resultTeam.newTeam.id,
       tournamentId: tournament.id,
       tournamentName: tournament.name,
       registrationId,
@@ -241,7 +270,7 @@ export async function registerTeam(params: {
       playerCount: cleanPlayerNames.length,
       registeredCount: resultTeam.nextCount,
       remainingSlots: resultTeam.remainingSlots,
-      discordDelivered: true,
+      discordDelivered,
       createdAt: new Date().toISOString(),
     });
   } catch (e) {
@@ -492,6 +521,7 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
   }
 
   if (!registered) return null;
+  if (await isTeamNameBanned(registered.teamName)) return null;
   return {
     userId: `${registered.tournamentId}_${registered.id}`,
     registrationId: registered.registrationId,
