@@ -63,6 +63,17 @@ export interface RegistrationLog {
   registeredCount: number;
   remainingSlots: number;
   discordDelivered: boolean;
+  discordStatus?: 'delivered' | 'pending' | 'failed';
+  createdAt: string;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  eventType: string;
+  summary: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  teamName?: string;
   createdAt: string;
 }
 

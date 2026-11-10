@@ -11,7 +11,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Tournament, Team, RegistrationLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
+import { Tournament, Team, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
 export function generateRegistrationId(): string {
@@ -231,6 +231,7 @@ export async function registerTeam(params: {
 
   // Relay registration to Discord securely via server-side API
   let discordDelivered = false;
+  let discordStatus: 'delivered' | 'pending' | 'failed' = 'pending';
   try {
     const notifyUrl = typeof window !== 'undefined' ? '/api/discord-notify' : 'http://localhost:3000/api/discord-notify';
     const notificationResponse = await fetch(notifyUrl, {
@@ -251,6 +252,7 @@ export async function registerTeam(params: {
     });
     const notificationResult = await notificationResponse.json().catch(() => ({}));
     discordDelivered = notificationResponse.ok && notificationResult.delivered === true;
+    discordStatus = discordDelivered ? 'delivered' : notificationResponse.ok && notificationResult.success ? 'pending' : 'failed';
     if (!discordDelivered) console.warn('Discord relay returned an error:', notificationResponse.status);
   } catch (err) {
     console.error('Error in Discord relay call:', err);
@@ -271,6 +273,7 @@ export async function registerTeam(params: {
       registeredCount: resultTeam.nextCount,
       remainingSlots: resultTeam.remainingSlots,
       discordDelivered,
+      discordStatus,
       createdAt: new Date().toISOString(),
     });
   } catch (e) {
@@ -394,6 +397,23 @@ export function subscribeRegistrationLogs(
       if (onError) onError(err);
     }
   );
+}
+
+export async function writeAdminActivityLog(event: Omit<AdminActivityLog, 'id' | 'createdAt'>): Promise<void> {
+  const id = `activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await setDoc(doc(db, 'admin_activity_logs', id), { ...event, id, createdAt: new Date().toISOString() });
+}
+
+export function subscribeAdminActivityLogs(onData: (logs: AdminActivityLog[]) => void, onError?: (error: unknown) => void) {
+  const path = 'admin_activity_logs';
+  return onSnapshot(collection(db, path), (snapshot) => {
+    const logs = snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<AdminActivityLog, 'id'>) }));
+    logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    onData(logs);
+  }, (error) => {
+    onError?.(error);
+    handleFirestoreError(error, OperationType.GET, path);
+  });
 }
 
 // 9b. Match Results & Leaderboard

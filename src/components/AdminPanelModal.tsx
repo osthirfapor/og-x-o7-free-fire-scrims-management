@@ -26,7 +26,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Tournament, Team, RegistrationLog, Player, MatchResult } from '../types/tournament';
+import { Tournament, Team, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
 import { RegistrationModal } from './RegistrationModal';
 import {
   createTournament,
@@ -35,6 +35,8 @@ import {
   updateTeam,
   deleteTeam,
   subscribeRegistrationLogs,
+  subscribeAdminActivityLogs,
+  writeAdminActivityLog,
   subscribeMatchResults,
   addMatchResult,
   deleteMatchResult,
@@ -120,6 +122,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Logs State
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
 
   // Search Filter in Teams tab
@@ -154,6 +157,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   useEffect(() => {
     if (!isAdmin) {
       setLogs([]);
+      setActivityLogs([]);
       setResults([]);
       return;
     }
@@ -170,9 +174,11 @@ export const AdminPanelModal: React.FC<Props> = ({
     const unsubLogs = subscribeRegistrationLogs((fetchedLogs) => {
       setLogs(fetchedLogs);
     });
+    const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
     const unsubResults = subscribeMatchResults((r) => setResults(r));
     return () => {
       unsubLogs();
+      unsubActivity();
       unsubResults();
     };
   }, [isAdmin]);
@@ -189,6 +195,11 @@ export const AdminPanelModal: React.FC<Props> = ({
     } finally {
       setAuthBusy(false);
     }
+  };
+
+  const recordAdminActivity = (eventType: string, summary: string, teamName?: string) => {
+    void writeAdminActivityLog({ eventType, summary, tournamentId: currentTour.id || undefined, tournamentName: currentTour.name, teamName })
+      .catch((error) => console.warn('Could not save admin activity log:', error));
   };
 
   // Switch tournament
@@ -233,6 +244,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     try {
       await updateTournament(currentTour.id, { status: nextStatus });
       setTourStatus(nextStatus);
+      recordAdminActivity(nextStatus === 'open' ? 'registration_opened' : 'registration_closed', `Registration ${nextStatus} for ${currentTour.name}.`);
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
     }
@@ -252,6 +264,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         map: tourMap,
         cardImageUrl: tourCardImage.trim(),
       });
+      recordAdminActivity('tournament_updated', `Updated tournament settings for ${tourName}.`);
       setSaveTourSuccess(true);
       setTimeout(() => setSaveTourSuccess(false), 2500);
     } catch (err: any) {
@@ -268,6 +281,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         redirectLinkEnabled: redirectEnabled,
         redirectButtonText: redirectBtnText.trim(),
       });
+      recordAdminActivity('group_link_updated', `Updated CG group link for ${currentTour.name}.`);
       setSaveRedirectSuccess(true);
       setTimeout(() => setSaveRedirectSuccess(false), 2500);
     } catch (err: any) {
@@ -282,6 +296,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         redirectLink: '',
         redirectLinkEnabled: false,
       });
+      recordAdminActivity('group_link_removed', `Removed CG group link for ${currentTour.name}.`);
       setRedirectLink('');
       setRedirectEnabled(false);
       setSaveRedirectSuccess(true);
@@ -309,6 +324,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         redirectButtonText: 'Join Official Discord Lounge',
         cardImageUrl: newTourCardImage.trim(),
       });
+      void writeAdminActivityLog({ eventType: 'tournament_created', summary: `Created ${newTourCategory} tournament: ${newTourName.trim()}.`, tournamentId: newId, tournamentName: newTourName.trim() }).catch((error) => console.warn('Could not save admin activity log:', error));
       setNewlyCreatedRegistrationLink(buildRegistrationLink(newId));
       setTab('overview');
       setShowCreateTour(false);
@@ -328,6 +344,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (confirm('Are you sure you want to permanently delete this tournament and its registrations?')) {
       try {
         await deleteTournament(id);
+        void writeAdminActivityLog({ eventType: 'tournament_deleted', summary: `Deleted tournament ${tournaments.find((item) => item.id === id)?.name || id}.`, tournamentId: id, tournamentName: tournaments.find((item) => item.id === id)?.name }).catch((error) => console.warn('Could not save admin activity log:', error));
       } catch (err: any) {
         alert(`Failed to delete tournament: ${err.message}`);
       }
@@ -340,6 +357,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       if (nextStatus === 'banned') await setTeamBanned(team.teamName, true);
       if (team.status === 'banned' && nextStatus !== 'banned') await setTeamBanned(team.teamName, false);
       await updateTeam(team.tournamentId, team.id, { status: nextStatus });
+      recordAdminActivity(team.status === 'banned' && nextStatus !== 'banned' ? 'team_unbanned' : nextStatus === 'banned' ? 'team_banned' : nextStatus === 'approved' ? 'team_approved' : 'team_rejected', `${team.teamName} was ${team.status === 'banned' && nextStatus !== 'banned' ? 'unbanned' : nextStatus}.`, team.teamName);
     } catch (err: any) {
       if (nextStatus === 'banned') await setTeamBanned(team.teamName, false).catch(() => undefined);
       alert(`Failed to update team: ${err.message}`);
@@ -351,6 +369,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (confirm(`Remove team "${team.teamName}"? This will decrement registered count and open a slot.`)) {
       try {
         await deleteTeam(team.tournamentId, team.id);
+        recordAdminActivity('team_removed', `Removed team ${team.teamName} from ${currentTour.name}.`, team.teamName);
       } catch (err: any) {
         alert(`Failed to delete team: ${err.message}`);
       }
@@ -366,6 +385,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         teamName: editTeamName.trim(),
         leaderName: editLeaderName.trim(),
       });
+      recordAdminActivity('team_updated', `Updated team details for ${editTeamName.trim()}.`, editTeamName.trim());
       setEditingTeam(null);
     } catch (err: any) {
       alert(`Failed to edit team: ${err.message}`);
@@ -387,6 +407,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         setDiscordMasked(discordWebhookUrl.replace(/(webhooks\/\d+\/)(.+)/, '$1••••••••'));
         setDiscordWebhookUrl('');
         setDiscordTestStatus('Webhook URL saved to server relay.');
+        recordAdminActivity('discord_webhook_updated', `Updated Discord webhook settings for ${currentTour.name}.`);
       }
     } catch (e: any) {
       alert('Failed to save webhook: ' + e.message);
@@ -405,8 +426,10 @@ export const AdminPanelModal: React.FC<Props> = ({
       const data = await res.json();
       if (data.success) {
         setDiscordTestStatus('✅ Test message sent! Check your Discord channel.');
+        recordAdminActivity('discord_test_sent', `Discord webhook test succeeded for ${currentTour.name}.`);
       } else {
         setDiscordTestStatus(`❌ Discord error: ${data.error}`);
+        recordAdminActivity('discord_test_failed', `Discord webhook test failed for ${currentTour.name}.`);
       }
     } catch (e: any) {
       setDiscordTestStatus(`❌ Failed to send test: ${e.message}`);
@@ -433,6 +456,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         kills: Math.max(0, Number(resKills) || 0),
         earnings: Math.max(0, Number(resEarnings) || 0),
       });
+      recordAdminActivity('match_result_added', `Saved rank #${resPosition} for ${resTeam}.`, resTeam);
       setResMsg(`✅ ${resTeam} — Rank #${resPosition} saved.`);
       setResKills(0);
       setResEarnings(0);
@@ -450,6 +474,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (confirm(`"${r.teamName}" er result (Rank #${r.position}) delete korben?`)) {
       try {
         await deleteMatchResult(r.id);
+        recordAdminActivity('match_result_removed', `Removed match result for ${r.teamName} (rank #${r.position}).`, r.teamName);
       } catch (err: any) {
         alert(`Failed to delete result: ${err.message}`);
       }
@@ -628,7 +653,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   { id: 'tournament', label: 'Tournament Info', icon: Sliders },
                   { id: 'redirect', label: 'CG Group Link', icon: Link },
                   { id: 'discord', label: 'Discord Relay', icon: Send },
-                  { id: 'logs', label: `Activity Logs (${logs.length})`, icon: ListFilter },
+                  { id: 'logs', label: `Activity Logs (${logs.length + activityLogs.length})`, icon: ListFilter },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -1306,14 +1331,17 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'logs' && (
                 <div className="space-y-3">
                   <div className="text-xs text-gray-400">
-                    Live registration events and Discord notification delivery history:
+                    Team registration, Discord delivery, tournament changes, team moderation, match results, and admin actions:
                   </div>
 
-                  {logs.length === 0 ? (
+                  {logs.length === 0 && activityLogs.length === 0 ? (
                     <div className="bg-[#15161d] p-8 rounded-xl text-center text-gray-400 text-xs">
-                      No registration logs recorded yet.
+                      No activity recorded yet.
                     </div>
                   ) : (
+                    <>
+                    <h3 className="pt-2 text-[10px] font-bold uppercase tracking-widest text-indigo-200">Tournament registrations & Discord</h3>
+                    {logs.length === 0 ? <div className="rounded-xl border border-white/[.06] p-4 text-xs text-slate-500">No team registrations recorded yet.</div> : (
                     <div className="space-y-2">
                       {logs.map((log) => (
                         <div
@@ -1333,8 +1361,8 @@ export const AdminPanelModal: React.FC<Props> = ({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${log.discordDelivered ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-300 border-rose-500/20'}`}>
-                              {log.discordDelivered ? 'DISCORD SENT' : 'DISCORD FAILED'}
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${(log.discordStatus || (log.discordDelivered ? 'delivered' : 'failed')) === 'delivered' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (log.discordStatus === 'pending' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-rose-500/10 text-rose-300 border-rose-500/20')}`}>
+                              {log.discordStatus === 'pending' ? 'DISCORD PENDING' : log.discordStatus === 'delivered' || (!log.discordStatus && log.discordDelivered) ? 'DISCORD SENT' : 'DISCORD FAILED'}
                             </span>
                             <div className="text-[10px] text-gray-500 mt-0.5">
                               {new Date(log.createdAt).toLocaleTimeString()}
@@ -1343,6 +1371,26 @@ export const AdminPanelModal: React.FC<Props> = ({
                         </div>
                       ))}
                     </div>
+                    )}
+                    <h3 className="pt-3 text-[10px] font-bold uppercase tracking-widest text-orange-200">Admin activity</h3>
+                    {activityLogs.length === 0 ? <div className="rounded-xl border border-white/[.06] p-4 text-xs text-slate-500">No admin actions recorded yet.</div> : (
+                      <div className="space-y-2">
+                        {activityLogs.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#272833] bg-[#15161d] p-3 text-xs">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded border border-orange-300/15 bg-orange-300/[.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-orange-200">{item.eventType.replaceAll('_', ' ')}</span>
+                                {item.teamName && <span className="font-bold text-white">{item.teamName}</span>}
+                                {item.tournamentName && <span className="truncate text-slate-400">{item.tournamentName}</span>}
+                              </div>
+                              <div className="mt-1 text-slate-400">{item.summary}</div>
+                            </div>
+                            <time className="shrink-0 text-[10px] text-slate-500">{new Date(item.createdAt).toLocaleString()}</time>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    </>
                   )}
                 </div>
               )}
