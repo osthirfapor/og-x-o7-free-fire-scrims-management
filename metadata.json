@@ -1,0 +1,6 @@
+{
+  "name": "OG x o7 — Free Fire Scrims Management",
+  "description": "Esports tournament registration and management platform for Garena Free Fire scrims.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

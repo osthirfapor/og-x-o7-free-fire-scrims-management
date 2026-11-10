@@ -1,0 +1,216 @@
+import express, { Request, Response } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// In-memory / fallback store for Discord webhook configuration
+interface AdminConfig {
+  discordWebhookUrl: string;
+  discordEnabled: boolean;
+}
+
+let adminConfig: AdminConfig = {
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+  discordEnabled: true,
+};
+
+// Config file path for persistent server settings
+const configFilePath = path.join(__dirname, '.admin-config.json');
+if (fs.existsSync(configFilePath)) {
+  try {
+    const raw = fs.readFileSync(configFilePath, 'utf-8');
+    adminConfig = { ...adminConfig, ...JSON.parse(raw) };
+  } catch (e) {
+    console.error('Failed to read config file:', e);
+  }
+}
+
+function saveConfig() {
+  try {
+    fs.writeFileSync(configFilePath, JSON.stringify(adminConfig, null, 2));
+  } catch (e) {
+    console.error('Failed to save config file:', e);
+  }
+}
+
+// Helper to send Discord Webhook embed
+async function sendDiscordEmbed(webhookUrl: string, embedData: {
+  title: string;
+  description: string;
+  color: number;
+  fields: { name: string; value: string; inline?: boolean }[];
+  footer?: { text: string };
+  timestamp?: string;
+}) {
+  if (!webhookUrl || !webhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+    throw new Error('Invalid or empty Discord Webhook URL');
+  }
+
+  const payload = {
+    username: 'OG x o7 Scrims Bot',
+    avatar_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=128&auto=format&fit=crop&q=80',
+    embeds: [embedData],
+  };
+
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Discord API error (${response.status}): ${text}`);
+  }
+  return true;
+}
+
+// API: Send Discord Notification for Team Registration
+app.post('/api/discord-notify', async (req: Request, res: Response) => {
+  try {
+    const {
+      registrationId,
+      teamName,
+      leaderName,
+      leaderUid,
+      playerCount = 5,
+      registrationTime,
+      currentRegisteredCount,
+      maxTeams = 12,
+      remainingSlots,
+      tournamentName = 'Free Fire Scrims',
+      customWebhookUrl,
+    } = req.body;
+
+    if (!registrationId || !teamName || !leaderName) {
+      return res.status(400).json({ error: 'Missing required registration details' });
+    }
+
+    const webhookToUse = customWebhookUrl || adminConfig.discordWebhookUrl;
+
+    if (!webhookToUse) {
+      // If no webhook configured yet, log safely and inform caller
+      console.log(`[DISCORD NOTIFY PENDING] Team "${teamName}" (${registrationId}) registered. No webhook URL set yet.`);
+      return res.status(200).json({
+        success: true,
+        delivered: false,
+        message: 'Registration recorded. Set Discord Webhook URL in Admin Panel to receive Discord alerts.',
+      });
+    }
+
+    const embed = {
+      title: `🔥 New Team Registered: ${teamName}`,
+      description: `**Tournament:** ${tournamentName}\nA new squad has officially joined the scrims!`,
+      color: 0x6366F1, // Esports Purple / Indigo
+      fields: [
+        { name: '📋 Registration ID', value: `\`${registrationId}\``, inline: true },
+        { name: '👑 Team Leader', value: leaderName, inline: true },
+        { name: '👥 Squad Players', value: Array.isArray(req.body.players) ? req.body.players.join(' • ') : '5 Players (4 Main + 1 Backup)', inline: false },
+        { name: '📊 Slot Progress', value: `**${currentRegisteredCount} / ${maxTeams} Teams**`, inline: true },
+        { name: '⏳ Remaining Slots', value: `**${remainingSlots} Slot${remainingSlots === 1 ? '' : 's'} Left**`, inline: true },
+        { name: '🕒 Registration Time', value: registrationTime || new Date().toISOString(), inline: true },
+      ],
+      footer: { text: 'OG x o7 Free Fire Esports Scrims Management' },
+      timestamp: new Date().toISOString(),
+    };
+
+    await sendDiscordEmbed(webhookToUse, embed);
+
+    return res.status(200).json({
+      success: true,
+      delivered: true,
+      message: 'Discord notification delivered successfully!',
+    });
+  } catch (error: any) {
+    console.error('Discord webhook error:', error);
+    return res.status(500).json({
+      success: false,
+      delivered: false,
+      error: error.message || 'Failed to dispatch Discord webhook',
+    });
+  }
+});
+
+// API: Test Discord Webhook
+app.post('/api/admin/discord-test', async (req: Request, res: Response) => {
+  try {
+    const { webhookUrl } = req.body;
+    const url = webhookUrl || adminConfig.discordWebhookUrl;
+
+    if (!url) {
+      return res.status(400).json({ error: 'Please provide a valid Discord Webhook URL' });
+    }
+
+    const embed = {
+      title: '✅ Discord Webhook Connected: OG x o7 Scrims',
+      description: 'Your Discord channel is now securely configured to receive automatic team registration notifications!',
+      color: 0x10B981, // Emerald Green
+      fields: [
+        { name: 'Status', value: '🟢 Active & Ready', inline: true },
+        { name: 'Game', value: 'Garena Free Fire', inline: true },
+        { name: 'Configured At', value: new Date().toLocaleTimeString(), inline: true },
+      ],
+      footer: { text: 'OG x o7 System Test Notification' },
+      timestamp: new Date().toISOString(),
+    };
+
+    await sendDiscordEmbed(url, embed);
+    return res.status(200).json({ success: true, message: 'Test message sent to Discord!' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to send test message' });
+  }
+});
+
+// API: Get / Save Admin Server Settings
+app.get('/api/admin/config', (req: Request, res: Response) => {
+  res.json({
+    hasDiscordWebhook: Boolean(adminConfig.discordWebhookUrl),
+    discordWebhookMasked: adminConfig.discordWebhookUrl
+      ? adminConfig.discordWebhookUrl.replace(/(webhooks\/\d+\/)(.+)/, '$1••••••••')
+      : '',
+    discordEnabled: adminConfig.discordEnabled,
+  });
+});
+
+app.post('/api/admin/config', (req: Request, res: Response) => {
+  const { discordWebhookUrl, discordEnabled } = req.body;
+  if (discordWebhookUrl !== undefined) {
+    adminConfig.discordWebhookUrl = discordWebhookUrl.trim();
+  }
+  if (discordEnabled !== undefined) {
+    adminConfig.discordEnabled = Boolean(discordEnabled);
+  }
+  saveConfig();
+  res.json({ success: true, message: 'Admin settings saved successfully' });
+});
+
+// Setup Vite middleware in dev or static files in production
+async function startServer() {
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+  } else {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`OG x o7 Scrims Server running on port ${PORT}`);
+  });
+}
+
+startServer();

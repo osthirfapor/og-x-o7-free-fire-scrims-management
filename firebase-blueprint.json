@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Represents an esports tournament or scrim session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "game": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "maxTeams": { "type": "number" },
+        "registeredCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed", "completed"] },
+        "redirectLink": { "type": "string", "maxLength": 500 },
+        "redirectLinkEnabled": { "type": "boolean" },
+        "redirectButtonText": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "game", "date", "time", "maxTeams", "registeredCount", "status"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "A registered esports team in a tournament",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "registrationId": { "type": "string", "maxLength": 50 },
+        "teamName": { "type": "string", "maxLength": 60 },
+        "leaderName": { "type": "string", "maxLength": 60 },
+        "leaderUid": { "type": "string", "maxLength": 30 },
+        "discordId": { "type": "string", "maxLength": 60 },
+        "players": { "type": "array" },
+        "playerUids": { "type": "array" },
+        "status": { "type": "string", "enum": ["approved", "pending", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["tournamentId", "registrationId", "teamName", "leaderName", "players", "status"]
+    },
+    "AdminSetting": {
+      "title": "AdminSetting",
+      "description": "System-wide admin settings like Discord webhook configuration and global defaults",
+      "type": "object",
+      "properties": {
+        "discordWebhookUrl": { "type": "string", "maxLength": 500 },
+        "discordNotificationsEnabled": { "type": "boolean" },
+        "defaultRedirectUrl": { "type": "string", "maxLength": 500 },
+        "defaultRedirectEnabled": { "type": "boolean" },
+        "adminPasscode": { "type": "string", "maxLength": 100 }
+      }
+    },
+    "RegistrationLog": {
+      "title": "RegistrationLog",
+      "description": "Audit and discord dispatch log for team registrations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "tournamentName": { "type": "string" },
+        "registrationId": { "type": "string" },
+        "teamName": { "type": "string" },
+        "leaderName": { "type": "string" },
+        "playerCount": { "type": "number" },
+        "registeredCount": { "type": "number" },
+        "remainingSlots": { "type": "number" },
+        "discordDelivered": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["tournamentId", "registrationId", "teamName", "leaderName", "playerCount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/tournaments/{tournamentId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "Tournament metadata and configuration"
+    },
+    "/tournaments/{tournamentId}/teams/{teamId}": {
+      "schema": { "$ref": "#/entities/Team" },
+      "description": "Teams registered under a specific tournament"
+    },
+    "/admin_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AdminSetting" },
+      "description": "Configuration settings managed by admins"
+    },
+    "/registration_logs/{logId}": {
+      "schema": { "$ref": "#/entities/RegistrationLog" },
+      "description": "Audit trail for tournament registrations"
+    }
+  }
+}
