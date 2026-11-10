@@ -95,6 +95,7 @@ function MainApp() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
   const [isAdminPage, setIsAdminPage] = useState(() => ADMIN_PANEL_ENABLED && new URLSearchParams(window.location.search).get('panel') === 'admin');
+  const handledRegistrationLink = useRef(false);
 
   const openAdminPage = () => {
     if (!ADMIN_PANEL_ENABLED) return;
@@ -147,6 +148,22 @@ function MainApp() {
       });
     return () => { cancelled = true; };
   }, []);
+
+  // Registration links select the right tournament and open its form directly.
+  // A saved squad can still use this link; the form will prefill its local profile.
+  useEffect(() => {
+    if (handledRegistrationLink.current || isAdminPage || PUBLIC_READ_ONLY || !tournaments.length) return;
+    const requestedId = new URLSearchParams(window.location.search).get('register');
+    if (!requestedId) return;
+    const requestedTournament = tournaments.find((tournament) => tournament.id === requestedId);
+    if (!requestedTournament) return;
+    handledRegistrationLink.current = true;
+    setActiveTournament(requestedTournament);
+    setShowRegModal(true);
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('register');
+    window.history.replaceState({}, '', cleanUrl.toString());
+  }, [tournaments, isAdminPage]);
 
   const handleOpenRegistration = (tour?: Tournament) => {
     if (tour) setActiveTournament(tour);
@@ -303,6 +320,8 @@ function MainApp() {
       <>
         <TeamLoginGate
           onLoginSuccess={(profile) => {
+          setShowSuccessModal(false);
+          setRegisteredSuccessTeam(null);
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}

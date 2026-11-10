@@ -21,6 +21,7 @@ import {
   Sliders,
   Trophy,
   Crown,
+  Copy,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Tournament, Team, RegistrationLog, Player, MatchResult } from '../types/tournament';
@@ -90,6 +91,8 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // New Tournament Modal State
   const [showCreateTour, setShowCreateTour] = useState(false);
+  const [newlyCreatedRegistrationLink, setNewlyCreatedRegistrationLink] = useState('');
+  const [copiedRegistrationLink, setCopiedRegistrationLink] = useState<string | null>(null);
   const [newTourName, setNewTourName] = useState('');
   const [newTourDate, setNewTourDate] = useState('');
   const [newTourTime, setNewTourTime] = useState('18:00 UTC');
@@ -198,6 +201,25 @@ export const AdminPanelModal: React.FC<Props> = ({
     setRedirectBtnText(tour.redirectButtonText || 'Join Scrims Group');
   };
 
+  const buildRegistrationLink = (tournamentId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('panel');
+    url.searchParams.set('register', tournamentId);
+    url.hash = '';
+    return `${url.origin}${url.pathname}${url.search}`;
+  };
+
+  const copyRegistrationLink = async (tournamentId: string) => {
+    const link = buildRegistrationLink(tournamentId);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedRegistrationLink(tournamentId);
+      window.setTimeout(() => setCopiedRegistrationLink(null), 2200);
+    } catch {
+      window.prompt('Copy registration link:', link);
+    }
+  };
+
   // Toggle Tournament Open/Closed
   const toggleRegistration = async () => {
     const nextStatus = currentTour.status === 'open' ? 'closed' : 'open';
@@ -278,6 +300,8 @@ export const AdminPanelModal: React.FC<Props> = ({
         redirectButtonText: 'Join Official Discord Lounge',
         cardImageUrl: newTourCardImage.trim(),
       });
+      setNewlyCreatedRegistrationLink(buildRegistrationLink(newId));
+      setTab('overview');
       setShowCreateTour(false);
       setNewTourName('');
       setNewTourGroupLink('');
@@ -669,6 +693,19 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
                   </div>
 
+                  {newlyCreatedRegistrationLink && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/[.07] p-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">Tournament registration link</div>
+                        <div className="mt-1 truncate font-mono text-[11px] text-slate-300">{newlyCreatedRegistrationLink}</div>
+                      </div>
+                      <button type="button" onClick={() => navigator.clipboard.writeText(newlyCreatedRegistrationLink).then(() => setCopiedRegistrationLink('new')).catch(() => window.prompt('Copy registration link:', newlyCreatedRegistrationLink))} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-indigo-500/20 px-3 py-2 text-[11px] font-bold text-indigo-100 transition hover:bg-indigo-500/30">
+                        {copiedRegistrationLink === 'new' ? <Check size={13} /> : <Copy size={13} />}
+                        {copiedRegistrationLink === 'new' ? 'Copied' : 'Copy link'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Scrims List in Overview */}
                   <div className="bg-[#151926] border border-[#242b3e] rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -710,6 +747,10 @@ export const AdminPanelModal: React.FC<Props> = ({
                               className="px-2.5 py-1 bg-[#1e2334] hover:bg-[#272e44] text-indigo-300 rounded font-semibold transition-colors"
                             >
                               Manage
+                            </button>
+                            <button type="button" onClick={() => void copyRegistrationLink(t.id)} className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2.5 py-1 font-semibold text-indigo-300 transition hover:bg-indigo-500/20" title="Copy tournament registration link">
+                              {copiedRegistrationLink === t.id ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedRegistrationLink === t.id ? 'Copied' : 'Reg link'}
                             </button>
                             {tournaments.length > 1 && (
                               <button
