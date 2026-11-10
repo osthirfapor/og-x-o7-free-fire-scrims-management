@@ -450,6 +450,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Filter teams for current tournament
   const currentTourTeams = teams.filter((t) => t.tournamentId === currentTour.id);
+  const tournamentsWithSlots = tournaments.filter((t) => t.registeredCount < t.maxTeams);
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();
     if (!q) return true;
@@ -721,7 +722,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
 
                     <div className="divide-y divide-[#22232c]">
-                      {tournaments.map((t) => (
+                      {tournamentsWithSlots.map((t) => (
                         <div key={t.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
                             <div className="font-bold text-white text-sm">{t.name}</div>
@@ -764,6 +765,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                           </div>
                         </div>
                       ))}
+                      {tournamentsWithSlots.length === 0 && (
+                        <div className="py-6 text-center text-xs text-gray-500">
+                          No tournaments with open slots. Full tournaments remain available in the Selected Scrim menu.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -230,7 +230,8 @@ function MainApp() {
   // Filter tournaments by category
   const filteredTournaments = useMemo(() => {
     return tournaments.filter((t) => {
-      return categoryFilter === 'all' || (t.category || 'practice') === categoryFilter;
+      const hasAvailableSlots = t.registeredCount < t.maxTeams;
+      return hasAvailableSlots && (categoryFilter === 'all' || (t.category || 'practice') === categoryFilter);
     });
   }, [tournaments, categoryFilter]);
 
@@ -679,6 +680,11 @@ function MainApp() {
                         </div>
                       );
                     })}
+                    {filteredTournaments.length === 0 && (
+                      <div className="col-span-full rounded-2xl border border-white/[.08] bg-white/[.025] px-5 py-10 text-center text-sm text-slate-400">
+                        No tournaments with available slots right now.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
