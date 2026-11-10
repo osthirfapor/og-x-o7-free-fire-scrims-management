@@ -46,7 +46,9 @@ import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
 
 const PUBLIC_READ_ONLY = import.meta.env.PROD || import.meta.env.VITE_READ_ONLY_MODE === 'true';
-const ADMIN_PANEL_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ADMIN_ENABLED === 'true';
+// The admin route is public to reach, but Firebase Auth + the protected admin
+// allowlist determine whether anyone can see or change admin data.
+const ADMIN_PANEL_ENABLED = true;
 
 // Free Fire Themed PNG Art / Illustrations for Square Cards
 const CARD_BACKGROUNDS: Record<string, string> = {

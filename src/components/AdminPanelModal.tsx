@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Tournament, Team, RegistrationLog, Player, MatchResult } from '../types/tournament';
+import { RegistrationModal } from './RegistrationModal';
 import {
   createTournament,
   updateTournament,
@@ -57,11 +58,12 @@ export const AdminPanelModal: React.FC<Props> = ({
   onClose,
   standalone = false,
 }) => {
-  const { isAdmin, loginWithCredentials, logout } = useAuth();
+  const { isAdmin, loginWithCredentials, logout, loading: authLoading } = useAuth();
 
   // Authentication State
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
@@ -110,6 +112,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Logs State
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
+  const [showAdminRegistration, setShowAdminRegistration] = useState(false);
 
   // Search Filter in Teams tab
   const [teamSearch, setTeamSearch] = useState('');
@@ -137,8 +140,14 @@ export const AdminPanelModal: React.FC<Props> = ({
     setRedirectBtnText(activeTournament.redirectButtonText || 'Join Scrims Group');
   }, [activeTournament]);
 
-  // Load server config for Discord Webhook
+  // Load privileged data only after Firebase confirms this user is an admin.
   useEffect(() => {
+    if (!isAdmin) {
+      setLogs([]);
+      setResults([]);
+      return;
+    }
+
     fetch('/api/admin/config')
       .then((res) => res.json())
       .then((data) => {
@@ -156,15 +165,19 @@ export const AdminPanelModal: React.FC<Props> = ({
       unsubLogs();
       unsubResults();
     };
-  }, []);
+  }, [isAdmin]);
 
-  // Passcode login handler
-  const handlePasscodeSubmit = (e: React.FormEvent) => {
+  // Firebase Authentication + Firestore admin allowlist
+  const handlePasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    const ok = loginWithCredentials(username, password);
-    if (!ok) {
-      setAuthError('Incorrect username or password. Please try again.');
+    setAuthBusy(true);
+    try {
+      await loginWithCredentials(email, password);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not sign in. Please try again.');
+    } finally {
+      setAuthBusy(false);
     }
   };
 
@@ -462,7 +475,9 @@ export const AdminPanelModal: React.FC<Props> = ({
         </div>
 
         {/* If NOT Admin, Show Secure Login Screen */}
-        {!isAdmin ? (
+        {authLoading ? (
+          <div className="py-12 text-center text-sm text-gray-400">Checking Firebase admin access…</div>
+        ) : !isAdmin ? (
           <div className="py-12 px-4 max-w-md mx-auto text-center space-y-6">
             <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400 shadow-[0_0_25px_rgba(99,102,241,0.2)]">
               <Lock size={30} />
@@ -471,7 +486,7 @@ export const AdminPanelModal: React.FC<Props> = ({
             <div>
               <h3 className="text-xl font-bold text-white">Admin Authentication Required</h3>
               <p className="text-xs text-gray-400 mt-1">
-                Enter your admin username and password to continue.
+                Sign in with the Firebase account approved for admin access.
               </p>
             </div>
 
@@ -481,15 +496,16 @@ export const AdminPanelModal: React.FC<Props> = ({
               </div>
             )}
 
-            {/* Admin Username and Password */}
+            {/* Firebase admin account credentials */}
             <form onSubmit={handlePasscodeSubmit} className="space-y-3">
               <div>
                 <input
-                  type="text"
+                  type="email"
+                  required
                   autoComplete="username"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Admin email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#0d1017] border border-[#2b334a] rounded-xl px-4 py-2.5 text-sm text-center text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
                 />
               </div>
@@ -505,9 +521,10 @@ export const AdminPanelModal: React.FC<Props> = ({
               </div>
               <button
                 type="submit"
+                disabled={authBusy || !email.trim() || !password}
                 className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/30 transition-all"
               >
-                Unlock Admin Dashboard
+                {authBusy ? 'Signing in…' : 'Sign in to Admin Dashboard'}
               </button>
             </form>
           </div>
@@ -711,7 +728,7 @@ export const AdminPanelModal: React.FC<Props> = ({
               {/* TAB 2: TEAMS MANAGEMENT */}
               {tab === 'teams' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <input
                       type="text"
                       placeholder="Filter teams by name, leader, or Registration ID..."
@@ -719,8 +736,18 @@ export const AdminPanelModal: React.FC<Props> = ({
                       onChange={(e) => setTeamSearch(e.target.value)}
                       className="w-full sm:w-80 bg-[#0d1017] border border-[#262c3e] rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                     />
-                    <div className="text-xs text-gray-400">
-                      Total: <span className="text-white font-bold">{searchedTeams.length}</span> Teams
+                    <div className="flex items-center gap-3 ml-auto">
+                      <div className="text-xs text-gray-400">
+                        Total: <span className="text-white font-bold">{searchedTeams.length}</span> Teams
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!currentTour.id || currentTour.status !== 'open' || currentTour.registeredCount >= currentTour.maxTeams}
+                        onClick={() => setShowAdminRegistration(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Plus size={13} /> Register Squad
+                      </button>
                     </div>
                   </div>
 
@@ -1455,6 +1482,16 @@ export const AdminPanelModal: React.FC<Props> = ({
               </form>
             </div>
           </div>
+        )}
+        {showAdminRegistration && currentTour.id && (
+          <RegistrationModal
+            tournament={currentTour}
+            onClose={() => setShowAdminRegistration(false)}
+            onSuccess={(team) => {
+              setShowAdminRegistration(false);
+              alert(`Team registered successfully. Official Registration ID: ${team.registrationId}`);
+            }}
+          />
         )}
       </div>
     </div>

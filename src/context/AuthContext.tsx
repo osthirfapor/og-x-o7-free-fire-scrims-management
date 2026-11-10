@@ -1,56 +1,77 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 
 interface AuthContextType {
   isAdmin: boolean;
-  adminPasscodeActive: boolean;
-  loginWithCredentials: (username: string, password: string) => boolean;
-  logout: () => void;
+  loginWithCredentials: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
-  adminPasscodeActive: false,
-  loginWithCredentials: () => false,
-  logout: () => {},
-  loading: false,
+  loginWithCredentials: async () => {},
+  logout: async () => {},
+  loading: true,
 });
 
-const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || '';
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
-const ADMIN_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ADMIN_ENABLED === 'true';
+async function userHasAdminAccess(uid: string): Promise<boolean> {
+  const adminRef = doc(db, 'admins', uid);
+  const adminSnapshot = await getDoc(adminRef);
+  return adminSnapshot.exists() && adminSnapshot.data().enabled === true;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [adminPasscodeActive, setAdminPasscodeActive] = useState<boolean>(() => {
-    return ADMIN_ENABLED && localStorage.getItem('ogxo7_admin_auth') === 'true';
-  });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const isAdmin = adminPasscodeActive;
+  useEffect(() => {
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
 
-  const loginWithCredentials = (username: string, password: string): boolean => {
-    if (ADMIN_ENABLED && ADMIN_USERNAME && ADMIN_PASSWORD && username.trim() === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      setAdminPasscodeActive(true);
-      localStorage.setItem('ogxo7_admin_auth', 'true');
-      return true;
+      setLoading(true);
+      try {
+        const allowed = await userHasAdminAccess(user.uid);
+        setIsAdmin(allowed);
+        if (!allowed) await signOut(auth);
+      } catch (error) {
+        console.error('Could not verify Firebase admin access:', error);
+        setIsAdmin(false);
+        await signOut(auth);
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, []);
+
+  const loginWithCredentials = async (email: string, password: string) => {
+    const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+    try {
+      const allowed = await userHasAdminAccess(credential.user.uid);
+      if (!allowed) {
+        await signOut(auth);
+        throw new Error('This Firebase account is not authorized as an admin.');
+      }
+      setIsAdmin(true);
+    } catch (error) {
+      await signOut(auth);
+      throw error;
     }
-    return false;
   };
 
-  const logout = () => {
-    setAdminPasscodeActive(false);
-    localStorage.removeItem('ogxo7_admin_auth');
+  const logout = async () => {
+    await signOut(auth);
+    setIsAdmin(false);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        isAdmin,
-        adminPasscodeActive,
-        loginWithCredentials,
-        logout,
-        loading: false,
-      }}
-    >
+    <AuthContext.Provider value={{ isAdmin, loginWithCredentials, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
