@@ -90,13 +90,15 @@ export async function registerTeam(params: {
 
   // Basic validation
   if (!teamName.trim()) throw new Error('Enter a team name.');
-  if (!teamLogo?.trim()) throw new Error('A team logo image URL is required.');
+  if (!teamLogo?.trim()) throw new Error('Upload a team logo image.');
+  const isUploadedLogo = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(teamLogo);
+  let isRemoteLogo = false;
   try {
-    const logoUrl = new URL(teamLogo.trim());
-    if (!['http:', 'https:'].includes(logoUrl.protocol)) throw new Error('invalid protocol');
-  } catch {
-    throw new Error('Enter a valid team logo image URL.');
-  }
+    const logoUrl = new URL(teamLogo);
+    isRemoteLogo = ['http:', 'https:'].includes(logoUrl.protocol);
+  } catch { /* Uploaded image data is validated separately. */ }
+  if (!isUploadedLogo && !isRemoteLogo) throw new Error('Upload a valid team logo image.');
+  if (isUploadedLogo && teamLogo.length > 300_000) throw new Error('Team logo is too large. Choose a smaller image.');
   if (!leaderName.trim()) throw new Error('Enter the captain in-game name.');
   if (players.length < 4 || players.length > 5) throw new Error('Add four main players and an optional backup.');
 

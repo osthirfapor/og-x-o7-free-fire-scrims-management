@@ -14,6 +14,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
   const [logoImageReady, setLogoImageReady] = useState(false);
+  const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
   const [players, setPlayers] = useState<Player[]>([
     { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
     { name: '', role: 'main', slotIndex: 2 },
@@ -28,15 +29,48 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const isUnavailable = tournament.status !== 'open' || tournament.registeredCount >= tournament.maxTeams;
   const updatePlayer = (index: number, name: string) => setPlayers((current) => current.map((player, i) => i === index ? { ...player, name } : player));
 
+  const handleLogoUpload = async (file?: File) => {
+    if (!file) return;
+    setError(null);
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Choose a PNG, JPG, or WebP image.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError('Logo must be 8 MB or smaller.');
+      return;
+    }
+    try {
+      const source = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 320 / Math.max(source.width, source.height));
+      canvas.width = Math.max(1, Math.round(source.width * scale));
+      canvas.height = Math.max(1, Math.round(source.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Image could not be processed.');
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      source.close();
+      let quality = 0.86;
+      let dataUrl = canvas.toDataURL('image/webp', quality);
+      while (dataUrl.length > 300_000 && quality > 0.4) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL('image/webp', quality);
+      }
+      if (dataUrl.length > 300_000) throw new Error('Logo is too detailed. Choose a smaller image.');
+      setTeamLogo(dataUrl);
+      setLogoImageReady(true);
+      setLogoName(file.name);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not process this image.');
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     if (isUnavailable) { setError('Registration is currently closed.'); return; }
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
-    let parsedLogoUrl: URL;
-    try { parsedLogoUrl = new URL(teamLogo.trim()); }
-    catch { setError('Enter a valid team logo image URL.'); return; }
-    if (!['http:', 'https:'].includes(parsedLogoUrl.protocol)) { setError('Logo URL must start with http or https.'); return; }
+    if (!teamLogo.trim()) { setError('Upload your team logo.'); return; }
     if (!logoImageReady) { setError('Wait for the team logo preview to load.'); return; }
     const starters = players.slice(0, 4);
     const backup = players[4];
@@ -50,7 +84,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
       const { team } = await registerTeam({
         tournament,
         teamName: teamName.trim(),
-        teamLogo: parsedLogoUrl.href,
+        teamLogo,
         leaderName: starters[0].name.trim(),
         players: submittedPlayers,
       });
@@ -103,12 +137,12 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               </div>
               <div className="min-w-0 flex-1">
                 <input
-                  id="registration-team-logo" type="url" required maxLength={500} autoComplete="url" value={teamLogo}
-                  onChange={(event) => { setTeamLogo(event.target.value); setLogoImageReady(false); }} placeholder="Paste a direct image URL"
+                  id="registration-team-logo" type="file" required={!teamLogo} accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}
                   disabled={isUnavailable}
-                  className="registration-input block h-11 min-w-0 w-full rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3.5 text-sm font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+                  className="registration-input block h-11 min-w-0 w-full cursor-pointer rounded-xl border border-white/[.09] bg-[#090c13]/90 px-3 py-2 text-xs font-medium text-white outline-none transition file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:text-indigo-200 disabled:opacity-50"
                 />
-                <p className="mt-1 pl-1 text-[9px] text-slate-600">PNG, JPG, or WebP image link</p>
+                <p className="mt-1 truncate pl-1 text-[9px] text-slate-600">{logoName || 'PNG, JPG or WebP · max 8 MB'}</p>
               </div>
               {teamLogo && <img src={teamLogo} alt="" aria-hidden="true" className="hidden" onLoad={() => setLogoImageReady(true)} onError={() => setLogoImageReady(false)} />}
             </div>
