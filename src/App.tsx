@@ -22,10 +22,7 @@ import {
   MapPin,
   Calendar,
   Sparkles,
-  Copy,
-  Check,
   LogOut,
-  Edit3,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -88,7 +85,6 @@ function MainApp() {
   // Captain / Team Profile State (for 1-click Auto-Refill)
   const [teamProfile, setTeamProfile] = useState<TeamProfile | null>(() => getLocalTeamProfile());
   const [checkingTeamSession, setCheckingTeamSession] = useState(() => Boolean(getLocalTeamProfile()));
-  const [headerCopiedLink, setHeaderCopiedLink] = useState(false);
 
   // Modals
   const [showRegModal, setShowRegModal] = useState(false);
@@ -108,13 +104,6 @@ function MainApp() {
     const publicUrl = new URL(window.location.href);
     publicUrl.searchParams.delete('panel');
     window.location.assign(publicUrl.toString());
-  };
-
-  const handleCopyLoginLink = () => {
-    const url = window.location.origin + window.location.pathname;
-    navigator.clipboard.writeText(url);
-    setHeaderCopiedLink(true);
-    setTimeout(() => setHeaderCopiedLink(false), 2000);
   };
 
   const handleLogoutTeam = () => {
@@ -304,7 +293,7 @@ function MainApp() {
   }
 
   // ================= MANDATORY LOGIN GATE =================
-  // Without login, nothing else is shown except the Login Form & Copy Link option
+  // Without login, show only the team login form and any explicitly requested registration form.
   if (checkingTeamSession) {
     return (
       <main className="app-shell flex min-h-screen items-center justify-center p-6 text-white">
@@ -475,8 +464,10 @@ function MainApp() {
 
           {/* Signed-in squad status */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] px-3 py-2 text-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,.8)]" />
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.035] px-2 py-1.5 text-xs">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-300/25 bg-indigo-500/15">
+                {teamProfile.teamLogo ? <img src={teamProfile.teamLogo} alt={`${teamProfile.teamName} logo`} className="h-full w-full object-cover" /> : <Gamepad2 size={15} className="text-indigo-200" />}
+              </span>
               <span className="max-w-[160px] truncate font-semibold text-slate-200">{teamProfile.teamName}</span>
             </div>
             <button
@@ -489,14 +480,6 @@ function MainApp() {
             </button>
             {!PUBLIC_READ_ONLY && (
               <>
-                <button
-                  onClick={handleCopyLoginLink}
-                  className="hidden items-center gap-1.5 rounded-xl border border-[#2b334a] bg-[#171a27] px-3 py-2 text-xs font-semibold text-indigo-300 shadow-sm transition-all hover:bg-[#212638] hover:text-white sm:flex"
-                  title="Copy Team Login Link"
-                >
-                  {headerCopiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                  <span>{headerCopiedLink ? 'Copied!' : 'Copy Login Link'}</span>
-                </button>
                 <button
                   onClick={() => handleOpenRegistration(activeTournament || undefined)}
                   className="action-primary shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/25"

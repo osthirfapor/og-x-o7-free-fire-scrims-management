@@ -13,7 +13,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
-  const [logoImageReady, setLogoImageReady] = useState(false);
+  const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo?.startsWith('data:image/')));
   const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
   const [players, setPlayers] = useState<Player[]>([
     { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
@@ -135,7 +135,12 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[.08] bg-[#090c13]">
                 {teamLogo && logoImageReady ? <img src={teamLogo} alt="Team logo preview" className="h-full w-full object-cover" /> : <Gamepad2 size={19} className="text-slate-600" />}
               </div>
-              <div className="min-w-0 flex-1 space-y-2">
+              {savedProfile?.teamLogo ? (
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-emerald-200">Team logo saved</div>
+                  <p className="mt-1 text-[9px] text-slate-500">Your logo will be reused for this registration.</p>
+                </div>
+              ) : <div className="min-w-0 flex-1 space-y-2">
                 <input
                   id="registration-team-logo-link" type="url" maxLength={500} autoComplete="url" value={teamLogo.startsWith('data:') ? '' : teamLogo}
                   onChange={(event) => { setTeamLogo(event.target.value); setLogoImageReady(false); setLogoName(event.target.value ? 'Checking image link…' : ''); }}
@@ -153,7 +158,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
                 />
                 </div>
                 <p className="truncate pl-1 text-[9px] text-slate-600">{logoName || 'PNG, JPG or WebP · max 8 MB'}</p>
-              </div>
+              </div>}
               {teamLogo && <img src={teamLogo} alt="" aria-hidden="true" className="hidden" onLoad={() => setLogoImageReady(true)} onError={() => setLogoImageReady(false)} />}
             </div>
           </div>
