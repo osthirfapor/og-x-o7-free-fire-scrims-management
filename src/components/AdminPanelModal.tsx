@@ -32,7 +32,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Tournament, Team, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
+import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
 import { RegistrationModal } from './RegistrationModal';
 import {
   createTournament,
@@ -50,6 +50,7 @@ import {
   calcPoints,
   buildLeaderboard,
   publishTournamentResults,
+  subscribeTeamAccounts,
   creditTeamWallet,
   subscribeTeamWallets,
   subscribeTeams,
@@ -142,6 +143,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
+  const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
   const [allRegisteredTeams, setAllRegisteredTeams] = useState<Team[]>([]);
   const [walletTeamSearch, setWalletTeamSearch] = useState('');
   const [teamWallets, setTeamWallets] = useState<TeamWallet[]>([]);
@@ -184,6 +186,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (!isAdmin) {
       setLogs([]);
       setActivityLogs([]);
+      setTeamAccounts([]);
       setTeamWallets([]);
       setResults([]);
       return;
@@ -202,11 +205,13 @@ export const AdminPanelModal: React.FC<Props> = ({
       setLogs(fetchedLogs);
     });
     const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
+    const unsubAccounts = subscribeTeamAccounts((items) => setTeamAccounts(items));
     const unsubWallets = subscribeTeamWallets((items) => setTeamWallets(items));
     const unsubResults = subscribeMatchResults((r) => setResults(r));
     return () => {
       unsubLogs();
       unsubActivity();
+      unsubAccounts();
       unsubWallets();
       unsubResults();
     };
@@ -582,7 +587,10 @@ export const AdminPanelModal: React.FC<Props> = ({
   const tournamentsWithSlots = activeScrims;
   const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
-  const registeredWalletTeamNames = Array.from(new Set(allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const registeredWalletTeamNames = Array.from(new Set([
+    ...teamAccounts.filter((account) => account.status === 'approved' || account.status === 'pending').map((account) => account.teamName.trim()),
+    ...allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()),
+  ].filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();

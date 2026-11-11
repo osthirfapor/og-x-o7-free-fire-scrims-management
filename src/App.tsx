@@ -100,6 +100,7 @@ function MainApp() {
   const [showWallet, setShowWallet] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showTeamAccountRegistration, setShowTeamAccountRegistration] = useState(false);
+  const [newAccountCredentials, setNewAccountCredentials] = useState<{ teamName: string; leaderName: string } | null>(null);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
   const [isAdminPage, setIsAdminPage] = useState(() => ADMIN_PANEL_ENABLED && new URLSearchParams(window.location.search).get('panel') === 'admin');
   const handledRegistrationLink = useRef(false);
@@ -364,9 +365,11 @@ function MainApp() {
     return (
       <>
         <TeamLoginGate
+          prefill={newAccountCredentials}
           onLoginSuccess={(profile) => {
             setShowSuccessModal(false);
             setRegisteredSuccessTeam(null);
+            setNewAccountCredentials(null);
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}
@@ -377,16 +380,7 @@ function MainApp() {
             onClose={() => setShowTeamAccountRegistration(false)}
             onSuccess={(account) => {
               setShowTeamAccountRegistration(false);
-              const profile: TeamProfile = {
-                userId: account.id,
-                teamName: account.teamName,
-                teamLogo: account.teamLogo,
-                leaderName: account.leaderName,
-                players: account.players,
-                updatedAt: account.updatedAt,
-              };
-              void saveTeamProfile(profile);
-              setTeamProfile(profile);
+              setNewAccountCredentials({ teamName: account.teamName, leaderName: account.leaderName });
             }}
           />
         )}

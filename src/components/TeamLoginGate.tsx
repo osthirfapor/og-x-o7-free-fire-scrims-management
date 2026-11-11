@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, Gamepad2, KeyRound, ShieldCheck } from 'lucide-react';
 import { TeamProfile } from '../types/tournament';
 import { findRegisteredTeamProfile, getLocalTeamProfile, saveTeamProfile } from '../services/tournamentService';
@@ -7,15 +7,22 @@ interface Props {
   onLoginSuccess: (profile: TeamProfile) => void;
   onOpenAdminSecret?: () => void;
   onRegister?: () => void;
+  prefill?: { teamName: string; leaderName: string } | null;
 }
 
-export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister }) => {
+export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister, prefill }) => {
   const existing = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(existing?.teamName || '');
   const [leaderName, setLeaderName] = useState(existing?.leaderName || '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setTeamName(prefill.teamName);
+    setLeaderName(prefill.leaderName);
+  }, [prefill]);
 
   const handleLogoTap = () => {
     const next = logoTaps + 1;
