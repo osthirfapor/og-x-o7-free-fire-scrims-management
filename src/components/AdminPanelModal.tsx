@@ -54,6 +54,7 @@ import {
   updateTeamAccountStatus,
   creditTeamWallet,
   subscribeTeamWallets,
+  subscribeTeams,
 } from '../services/tournamentService';
 
 interface Props {
@@ -144,11 +145,14 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
   const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
+  const [allRegisteredTeams, setAllRegisteredTeams] = useState<Team[]>([]);
+  const [walletTeamSearch, setWalletTeamSearch] = useState('');
   const [teamWallets, setTeamWallets] = useState<TeamWallet[]>([]);
   const [walletSearch, setWalletSearch] = useState('');
   const [walletTeamName, setWalletTeamName] = useState('');
   const [walletCreditAmount, setWalletCreditAmount] = useState('');
   const [walletCreditMessage, setWalletCreditMessage] = useState<string | null>(null);
+  const allTournamentIds = tournaments.map((tournament) => tournament.id).sort().join('|');
 
   // Search Filter in Teams tab
   const [teamSearch, setTeamSearch] = useState('');
@@ -213,6 +217,22 @@ export const AdminPanelModal: React.FC<Props> = ({
       unsubResults();
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin || !allTournamentIds) {
+      setAllRegisteredTeams([]);
+      return;
+    }
+    const ids = allTournamentIds.split('|');
+    setAllRegisteredTeams([]);
+    const unsubscribers = ids.map((tournamentId) => subscribeTeams(tournamentId, (items) => {
+      setAllRegisteredTeams((previous) => [
+        ...previous.filter((team) => team.tournamentId !== tournamentId),
+        ...items,
+      ]);
+    }));
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [isAdmin, allTournamentIds]);
 
   // Firebase Authentication + Firestore admin allowlist
   const handlePasscodeSubmit = async (e: React.FormEvent) => {
@@ -581,6 +601,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   const pendingTeamAccounts = teamAccounts.filter((account) => account.status === 'pending').length;
   const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
+  const registeredWalletTeamNames = Array.from(new Set(allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();
     if (!q) return true;
@@ -799,10 +821,11 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'wallets' && (
                 <section className="space-y-4">
                   <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-200">Team balances</div><h3 className="mt-1 text-lg font-extrabold text-white">Team Wallet</h3><p className="mt-1 text-xs text-slate-400">Credit a squad by team name. Paid tournament registration checks and deducts this balance automatically.</p></div>
+                  <div className="space-y-2 rounded-2xl border border-white/[.07] bg-[#101117] p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Registered teams ({registeredWalletTeamNames.length})</h4><div className="relative"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={walletTeamSearch} onChange={(event) => setWalletTeamSearch(event.target.value)} placeholder="Search team name" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-amber-300/30 sm:w-60"/></div></div><div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">{searchedWalletTeamNames.map((name) => <button type="button" key={name} onClick={() => { setWalletTeamName(name); setWalletCreditMessage(null); }} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition ${walletTeamName === name ? 'border-amber-300/30 bg-amber-300/10 text-amber-100' : 'border-white/[.07] bg-white/[.025] text-slate-300 hover:border-white/15 hover:text-white'}`}>{name}</button>)}{!searchedWalletTeamNames.length && <span className="py-2 text-[10px] text-slate-500">{registeredWalletTeamNames.length ? 'No team name matches your search.' : 'No registered teams found yet.'}</span>}</div></div>
                   <form onSubmit={handleWalletCredit} className="grid gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-4 sm:grid-cols-[1fr_180px_auto] sm:items-end">
-                    <label className="block"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Team name</span><input required list="wallet-team-names" value={walletTeamName} onChange={(event) => setWalletTeamName(event.target.value)} placeholder="Enter or choose team name" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"/><datalist id="wallet-team-names">{Array.from(new Set([...teamAccounts.map((account) => account.teamName), ...teams.map((team) => team.teamName)])).map((name) => <option key={name} value={name}/>)}</datalist></label>
+                    <label className="block"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected team</span><input required readOnly value={walletTeamName} placeholder="Select a registered team above" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none read-only:cursor-not-allowed read-only:text-amber-100 focus:border-amber-300/40"/></label>
                     <label className="block"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Add amount (৳)</span><input required type="number" min="0.01" step="0.01" value={walletCreditAmount} onChange={(event) => setWalletCreditAmount(event.target.value)} placeholder="e.g. 500" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"/></label>
-                    <button type="submit" className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs font-extrabold text-black transition hover:brightness-110"><Plus size={14} className="mr-1 inline"/>Add money</button>
+                    <button type="submit" disabled={!walletTeamName} className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2.5 text-xs font-extrabold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"><Plus size={14} className="mr-1 inline"/>Add money</button>
                     {walletCreditMessage && <div role="status" className="sm:col-span-3 rounded-lg border border-white/[.08] bg-black/20 px-3 py-2 text-xs text-amber-100">{walletCreditMessage}</div>}
                   </form>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Current balances</h4><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={walletSearch} onChange={(event) => setWalletSearch(event.target.value)} placeholder="Search team name" className="w-full rounded-xl border border-white/10 bg-[#0b0c10] py-2 pl-9 pr-3 text-xs text-white outline-none focus:border-amber-300/30 sm:w-64"/></div></div>

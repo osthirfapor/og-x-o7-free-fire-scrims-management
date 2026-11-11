@@ -28,6 +28,7 @@ import {
   ChevronDown,
   CalendarDays,
   CheckCircle2,
+  MessageCircle,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -90,6 +91,8 @@ function MainApp() {
   const [teamProfile, setTeamProfile] = useState<TeamProfile | null>(() => getLocalTeamProfile());
   const [checkingTeamSession, setCheckingTeamSession] = useState(() => Boolean(getLocalTeamProfile()));
   const [walletBalance, setWalletBalance] = useState(0);
+  const [topUpSelection, setTopUpSelection] = useState('500');
+  const [customTopUpAmount, setCustomTopUpAmount] = useState('');
 
   // Modals
   const [showRegModal, setShowRegModal] = useState(false);
@@ -269,6 +272,18 @@ function MainApp() {
     .filter((result) => result.teamName.trim().toLocaleLowerCase() === teamProfile?.teamName.trim().toLocaleLowerCase() && Number(result.earnings) > 0)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [publishedResults, teamProfile?.teamName]);
   const walletTotal = walletEntries.reduce((sum, result) => sum + (Number(result.earnings) || 0), 0);
+  const requestedTopUpAmount = topUpSelection === 'custom' ? Number(customTopUpAmount) : Number(topUpSelection);
+  const handleTopUpWhatsApp = () => {
+    if (!Number.isFinite(requestedTopUpAmount) || requestedTopUpAmount <= 0 || !teamProfile) return;
+    const message = [
+      'Hi, I need add money to my team wallet.',
+      `Team name: ${teamProfile.teamName}`,
+      `Captain IGN: ${teamProfile.leaderName}`,
+      `Amount: BDT ${requestedTopUpAmount.toLocaleString()}`,
+      `Current wallet balance: BDT ${walletBalance.toLocaleString()}`,
+    ].join('\n');
+    window.open(`https://wa.me/8801937679130?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
   const myRegistrations = useMemo(() => {
     if (!teamProfile) return [];
     return allTeams
@@ -865,6 +880,17 @@ function MainApp() {
                 <div className="mt-1 text-[10px] text-slate-500">Paid scrim fees are deducted automatically when your team registers.</div>
                 {walletTotal > 0 && <div className="mt-3 border-t border-amber-200/10 pt-2 text-[11px] text-amber-100/70">Prize earnings recorded: ৳{walletTotal.toLocaleString()}</div>}
               </div>
+              <section className="mt-4 rounded-2xl border border-emerald-300/15 bg-emerald-300/[.035] p-4">
+                <div className="text-sm font-extrabold text-white">Add Money</div>
+                <p className="mt-1 text-[11px] leading-5 text-slate-400">Choose an amount and message the organizer at <span className="font-semibold text-emerald-200">01937679130</span>. Your wallet updates after verification.</p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <select aria-label="Choose top-up amount" value={topUpSelection} onChange={(event) => setTopUpSelection(event.target.value)} className="min-h-11 flex-1 rounded-xl border border-white/10 bg-[#0b0c10] px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300/35">
+                    <option value="100">৳100</option><option value="200">৳200</option><option value="500">৳500</option><option value="1000">৳1,000</option><option value="2000">৳2,000</option><option value="custom">Custom amount</option>
+                  </select>
+                  {topUpSelection === 'custom' && <input aria-label="Custom top-up amount" type="number" min="1" step="1" value={customTopUpAmount} onChange={(event) => setCustomTopUpAmount(event.target.value)} placeholder="Amount (৳)" className="min-h-11 flex-1 rounded-xl border border-white/10 bg-[#0b0c10] px-3 text-sm text-white outline-none focus:border-emerald-300/35" />}
+                  <button type="button" disabled={!Number.isFinite(requestedTopUpAmount) || requestedTopUpAmount <= 0} onClick={handleTopUpWhatsApp} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#128c58] px-4 text-xs font-extrabold text-white transition hover:bg-[#16a367] disabled:cursor-not-allowed disabled:opacity-45"><MessageCircle size={15} /> Request on WhatsApp</button>
+                </div>
+              </section>
               <div className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400">Recent earnings</div>
               <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
                 {walletEntries.length ? walletEntries.map((result) => <div key={result.id} className="flex items-center justify-between rounded-xl border border-white/[.06] bg-white/[.025] px-3.5 py-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-white">{result.tournamentName}</div><div className="mt-1 text-[10px] text-slate-500">{result.createdAt ? new Date(result.createdAt).toLocaleDateString() : '—'}</div></div><div className="ml-3 text-sm font-extrabold text-emerald-300">+৳{Number(result.earnings).toLocaleString()}</div></div>) : <div className="rounded-xl border border-dashed border-white/[.08] py-7 text-center text-xs text-slate-500">No prize earnings recorded yet.</div>}
