@@ -302,7 +302,8 @@ button:not(:disabled):active {
 .stat-tile {
   position: relative;
   overflow: hidden;
-  transition: transform .3s var(--ease-out-expo), border-color .3s ease;
+  backdrop-filter: blur(14px);
+  transition: transform .35s var(--ease-out-expo), border-color .3s ease, box-shadow .35s ease;
 }
 
 .stat-tile::after {
@@ -315,8 +316,9 @@ button:not(:disabled):active {
 }
 
 .stat-tile:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px) scale(1.015);
   border-color: rgba(255, 130, 64, .35);
+  box-shadow: 0 12px 28px -18px rgba(99, 102, 241, .55);
 }
 
 .stat-tile:hover::after {
@@ -390,8 +392,15 @@ button:not(:disabled):active {
 
 .squad-hero {
   background:
-    radial-gradient(ellipse 34rem 18rem at 100% 0%, rgba(255, 95, 26, .16), transparent 70%),
+    radial-gradient(ellipse 34rem 18rem at 100% 0%, rgba(255, 95, 26, .17), transparent 70%),
+    radial-gradient(ellipse 26rem 18rem at 0% 100%, rgba(99, 102, 241, .13), transparent 72%),
     linear-gradient(135deg, #15161d 0%, #0e0f14 55%, #14110f 100%);
+  animation: squad-hero-enter 620ms var(--ease-out-expo) both;
+}
+
+@keyframes squad-hero-enter {
+  from { opacity: 0; transform: translateY(12px); filter: saturate(.7); }
+  to { opacity: 1; transform: translateY(0); filter: saturate(1); }
 }
 
 .squad-hero::before {
@@ -525,6 +534,7 @@ button:not(:disabled):active {
 }
 
 .squad-player:hover {
+  transform: translateX(3px);
   border-color: rgba(255, 130, 64, .3);
   background-color: rgba(255, 130, 64, .06);
 }

@@ -2,20 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   Crown,
-  DollarSign,
+  Coins,
   Search,
   Shield,
   ShieldCheck,
   Swords,
-  Target,
-  Trophy,
   Users,
   X,
 } from 'lucide-react';
-import { MatchResult, Team, Tournament } from '../types/tournament';
+import { MatchResult, Team, TeamAccount, Tournament } from '../types/tournament';
 
 interface Props {
   teams: Team[];
+  accounts: TeamAccount[];
   tournaments: Tournament[];
   matchResults: MatchResult[];
 }
@@ -36,13 +35,11 @@ interface Squad {
   players: SquadPlayer[];
   matches: number;
   wins: number;
-  kills: number;
-  points: number;
   earnings: number;
   tournaments: string[];
 }
 
-type SortMode = 'name' | 'points' | 'matches';
+type SortMode = 'name' | 'wins' | 'matches';
 
 const teamKey = (tournamentId: string, teamName: string) => `${tournamentId}:${teamName.trim().toLowerCase()}`;
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -50,11 +47,11 @@ const initials = (value: string) => value.trim().slice(0, 2).toUpperCase() || '?
 
 const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: 'name', label: 'A–Z' },
-  { id: 'points', label: 'Top points' },
+  { id: 'wins', label: 'Most wins' },
   { id: 'matches', label: 'Most matches' },
 ];
 
-export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchResults }) => {
+export const PlayerSearchView: React.FC<Props> = ({ teams, accounts, tournaments, matchResults }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name');
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -73,6 +70,31 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
       playerMap: Map<string, SquadPlayer>;
     }
     const drafts = new Map<string, Draft>();
+    const accountTeamNames = new Set<string>();
+
+    accounts
+      .filter((account) => account.status === 'approved' || account.status === 'pending')
+      .forEach((account) => {
+        const name = account.teamName.trim();
+        if (!name) return;
+        const key = name.toLocaleLowerCase();
+        accountTeamNames.add(key);
+        const players = (account.players || []).filter((player) => player.name.trim()).map((player) => ({ ...player, matches: 0, wins: 0 }));
+        drafts.set(key, {
+          key,
+          teamName: name,
+          logo: account.teamLogo,
+          leaderName: account.leaderName,
+          players,
+          matches: 0,
+          wins: 0,
+          earnings: 0,
+          tournaments: [],
+          seenTournaments: new Set<string>(),
+          seenPlayerTournaments: new Set<string>(),
+          playerMap: new Map(players.map((player) => [player.name.toLocaleLowerCase(), player])),
+        });
+      });
 
     [...teams]
       .filter((team) => team.status === 'approved')
@@ -89,8 +111,6 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
           players: [],
           matches: 0,
           wins: 0,
-          kills: 0,
-          points: 0,
           earnings: 0,
           tournaments: [],
           seenTournaments: new Set<string>(),
@@ -109,13 +129,11 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
           draft.seenTournaments.add(team.tournamentId);
           draft.matches += teamMatches.length;
           draft.wins += teamWins;
-          draft.kills += teamMatches.reduce((sum, match) => sum + (Number(match.kills) || 0), 0);
-          draft.points += teamMatches.reduce((sum, match) => sum + (Number(match.points) || 0), 0);
           draft.earnings += teamMatches.reduce((sum, match) => sum + Math.max(0, Number(match.earnings) || 0), 0);
           if (!draft.tournaments.includes(tournamentName)) draft.tournaments.push(tournamentName);
         }
 
-        (team.players || []).forEach((player) => {
+        if (!accountTeamNames.has(key)) (team.players || []).forEach((player) => {
           const playerName = player.name.trim();
           const playerKey = playerName.toLowerCase();
           if (!playerKey) return;
@@ -147,7 +165,7 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
         (a, b) => Number(a.role === 'backup') - Number(b.role === 'backup') || a.slotIndex - b.slotIndex || a.name.localeCompare(b.name),
       ),
     }));
-  }, [teams, tournaments, matchResults]);
+  }, [accounts, teams, tournaments, matchResults]);
 
   const visibleSquads = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -157,7 +175,7 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
       || squad.players.some((player) => player.name.toLowerCase().includes(query)));
 
     return [...list].sort((a, b) => {
-      if (sortMode === 'points') return b.points - a.points || b.wins - a.wins || a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
+      if (sortMode === 'wins') return b.wins - a.wins || a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
       if (sortMode === 'matches') return b.matches - a.matches || b.wins - a.wins || a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
       return a.teamName.localeCompare(b.teamName, undefined, { numeric: true, sensitivity: 'base' });
     });
@@ -171,6 +189,7 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
   const totalPlayers = squads.reduce((sum, squad) => sum + squad.players.length, 0);
   const totalMatches = squads.reduce((sum, squad) => sum + squad.matches, 0);
   const totalWins = squads.reduce((sum, squad) => sum + squad.wins, 0);
+  const totalEarnings = squads.reduce((sum, squad) => sum + squad.earnings, 0);
   const query = searchTerm.trim().toLowerCase();
 
   return (
@@ -185,15 +204,16 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
             </div>
             <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Teams &amp; players</h2>
             <p className="mt-1.5 text-xs leading-5 text-zinc-400 sm:text-sm">
-              Tap any squad to open its roster and see how many matches every player has played.
+              Every squad account and player IGN, with match wins and earnings.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-5">
             {[
               { label: 'Teams', value: squads.length, icon: <Shield size={14} className="text-ember-300" /> },
               { label: 'Players', value: totalPlayers, icon: <Users size={14} className="text-cyan-300" /> },
               { label: 'Matches', value: totalMatches, icon: <Swords size={14} className="text-amber-300" /> },
-              { label: 'Booyahs', value: totalWins, icon: <Crown size={14} className="text-yellow-300" /> },
+              { label: 'Wins', value: totalWins, icon: <Crown size={14} className="text-yellow-300" /> },
+              { label: 'Earnings', value: `৳${totalEarnings.toLocaleString()}`, icon: <Coins size={14} className="text-emerald-300" /> },
             ].map((stat) => (
               <div key={stat.label} className="stat-tile min-w-[92px] rounded-2xl border border-white/[.07] bg-black/30 px-3 py-2.5 sm:px-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">{stat.icon}{stat.label}</div>
@@ -245,7 +265,7 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-ember-300/10 bg-ember-300/[.07] text-ember-200"><Users size={25} /></div>
           <h3 className="font-bold text-white">{squads.length ? 'No team or player matched that search' : 'Squads are warming up'}</h3>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-zinc-500">
-            {squads.length ? 'Try another team name or player IGN.' : 'Approved squads appear here. Match numbers update as organizers add results.'}
+            {squads.length ? 'Try another team name or player IGN.' : 'Squad accounts will appear here as soon as they are created.'}
           </p>
         </div>
       ) : (
@@ -299,15 +319,13 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
                 <div id={panelId} className="squad-panel relative z-10" inert={!open}>
                   <div className="squad-panel-inner">
                     <div className="px-3.5 pb-4 sm:px-4">
-                      <div className="grid grid-cols-2 gap-2 border-t border-white/[.06] pt-4 sm:grid-cols-5">
+                      <div className="grid grid-cols-3 gap-2 border-t border-white/[.06] pt-4">
                         {[
                           { label: 'Matches', value: squad.matches, icon: <Swords size={13} className="text-cyan-300" /> },
-                          { label: 'Booyahs', value: squad.wins, icon: <Crown size={13} className="text-yellow-300" /> },
-                          { label: 'Kills', value: squad.kills, icon: <Target size={13} className="text-rose-300" /> },
-                          { label: 'Points', value: squad.points, icon: <Trophy size={13} className="text-ember-300" /> },
-                          { label: 'Earnings*', value: `৳${squad.earnings.toLocaleString()}`, icon: <DollarSign size={13} className="text-emerald-300" /> },
-                        ].map((stat, statIndex, all) => (
-                          <div key={stat.label} className={`rounded-xl border border-white/[.05] bg-black/25 px-3 py-2.5 ${statIndex === all.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
+                          { label: 'Wins', value: squad.wins, icon: <Crown size={13} className="text-yellow-300" /> },
+                          { label: 'Earnings', value: `৳${squad.earnings.toLocaleString()}`, icon: <Coins size={13} className="text-emerald-300" /> },
+                        ].map((stat) => (
+                          <div key={stat.label} className="rounded-xl border border-white/[.05] bg-black/25 px-3 py-2.5">
                             <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">{stat.icon}{stat.label}</div>
                             <div className="mt-1 truncate text-lg font-black tabular-nums text-white">{stat.value}</div>
                           </div>
@@ -316,12 +334,11 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
 
                       <div className="mt-4 flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-500">
                         <span>Roster</span>
-                        <span>Matches played</span>
+                        <span>{squad.players.length} players</span>
                       </div>
 
                       <ul className="mt-2 space-y-1.5">
                         {squad.players.map((player, playerIndex) => {
-                          const ratio = squad.matches > 0 ? Math.min(1, player.matches / squad.matches) : 0;
                           const hit = Boolean(query) && player.name.toLowerCase().includes(query);
                           return (
                             <li
@@ -336,17 +353,6 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
                                   <span className="truncate text-sm font-bold text-white">{player.name}</span>
                                   <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${player.role === 'backup' ? 'border-amber-300/20 bg-amber-300/[.07] text-amber-200' : 'border-ember-300/20 bg-ember-300/[.07] text-ember-200'}`}>{player.role}</span>
                                 </div>
-                                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/40">
-                                  <div className="squad-bar-fill h-full rounded-full bg-gradient-to-r from-ember-500 via-amber-400 to-yellow-300" style={{ width: `${Math.max(ratio * 100, player.matches > 0 ? 6 : 0)}%` }} />
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <div className="text-base font-black leading-none tabular-nums text-white">{player.matches}</div>
-                                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">{player.matches === 1 ? 'match' : 'matches'}</div>
-                              </div>
-                              <div className="hidden w-12 shrink-0 text-right sm:block">
-                                <div className="flex items-center justify-end gap-1 text-sm font-black leading-none tabular-nums text-yellow-300"><Crown size={11} />{player.wins}</div>
-                                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">{player.wins === 1 ? 'win' : 'wins'}</div>
                               </div>
                             </li>
                           );
@@ -356,7 +362,7 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, tournaments, matchRes
                       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[10px] text-zinc-500">
                         {squad.tournaments.slice(0, 4).map((name) => <span key={name} className="rounded-md border border-white/[.06] bg-white/[.03] px-2 py-0.5 text-zinc-400">{name}</span>)}
                         {squad.tournaments.length > 4 && <span>+{squad.tournaments.length - 4} more</span>}
-                        <span className="ml-auto text-zinc-600">*Shared prize money recorded for this squad.</span>
+                        <span className="ml-auto text-zinc-600">Results appear when matches are entered.</span>
                       </div>
                     </div>
                   </div>

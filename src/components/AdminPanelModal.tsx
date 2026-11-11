@@ -8,7 +8,6 @@ import {
   Edit2,
   Check,
   AlertTriangle,
-  Send,
   Link,
   Users,
   Settings,
@@ -90,7 +89,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'scrims' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -129,11 +128,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
   const [newTourCardImage, setNewTourCardImage] = useState('');
 
-  // Discord Webhook State
-  const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
-  const [discordMasked, setDiscordMasked] = useState('');
-  const [discordTestStatus, setDiscordTestStatus] = useState<string | null>(null);
-  const [discordTestLoading, setDiscordTestLoading] = useState(false);
+  const [squadSearch, setSquadSearch] = useState('');
 
   // Team Edit Modal State
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
@@ -142,6 +137,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Logs State
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
   const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
@@ -193,18 +189,10 @@ export const AdminPanelModal: React.FC<Props> = ({
       return;
     }
 
-    fetch('/api/admin/config')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.discordWebhookMasked) {
-          setDiscordMasked(data.discordWebhookMasked);
-        }
-      })
-      .catch((e) => console.log('Config load:', e));
-
     const unsubLogs = subscribeRegistrationLogs((fetchedLogs) => {
       setLogs(fetchedLogs);
-    });
+      setLogsError(null);
+    }, (error) => setLogsError(error instanceof Error ? error.message : 'Could not load registration logs.'));
     const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
     const unsubAccounts = subscribeTeamAccounts((items) => setTeamAccounts(items));
     const unsubWallets = subscribeTeamWallets((items) => setTeamWallets(items));
@@ -482,52 +470,6 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
-  // Discord Webhook Save & Test
-  const handleSaveDiscord = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!discordWebhookUrl.trim()) return;
-    try {
-      const res = await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discordWebhookUrl: discordWebhookUrl.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDiscordMasked(discordWebhookUrl.replace(/(webhooks\/\d+\/)(.+)/, '$1••••••••'));
-        setDiscordWebhookUrl('');
-        setDiscordTestStatus('Webhook URL saved to server relay.');
-        recordAdminActivity('discord_webhook_updated', `Updated Discord webhook settings for ${currentTour.name}.`);
-      }
-    } catch (e: any) {
-      alert('Failed to save webhook: ' + e.message);
-    }
-  };
-
-  const handleTestDiscord = async () => {
-    setDiscordTestLoading(true);
-    setDiscordTestStatus(null);
-    try {
-      const res = await fetch('/api/admin/discord-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhookUrl: discordWebhookUrl || undefined }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDiscordTestStatus('✅ Test message sent! Check your Discord channel.');
-        recordAdminActivity('discord_test_sent', `Discord webhook test succeeded for ${currentTour.name}.`);
-      } else {
-        setDiscordTestStatus(`❌ Discord error: ${data.error}`);
-        recordAdminActivity('discord_test_failed', `Discord webhook test failed for ${currentTour.name}.`);
-      }
-    } catch (e: any) {
-      setDiscordTestStatus(`❌ Failed to send test: ${e.message}`);
-    } finally {
-      setDiscordTestLoading(false);
-    }
-  };
-
   // Match result handlers
   const handleAddResult = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -597,6 +539,11 @@ export const AdminPanelModal: React.FC<Props> = ({
   const currentTourTeams = teams.filter((t) => t.tournamentId === currentTour.id);
   const activeScrims = tournaments.filter((tournament) => tournament.status !== 'completed');
   const tournamentsWithSlots = activeScrims;
+  const activeTournamentIds = new Set(activeScrims.map((tournament) => tournament.id));
+  const activeScrimTeams = allRegisteredTeams.filter((team) => activeTournamentIds.has(team.tournamentId) && team.status === 'approved');
+  const liveRegisteredTeamCount = activeScrims.reduce((count, tournament) => count + Math.max(0, Number(tournament.registeredCount) || 0), 0);
+  const liveRemainingSlotCount = activeScrims.reduce((count, tournament) => count + Math.max(0, tournament.maxTeams - tournament.registeredCount), 0);
+  const livePlayerCount = activeScrimTeams.reduce((count, team) => count + (team.players?.length || 0), 0);
   const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
   const registeredWalletTeamNames = Array.from(new Set([
@@ -604,6 +551,9 @@ export const AdminPanelModal: React.FC<Props> = ({
     ...allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()),
   ].filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
+  const visibleSquadAccounts = teamAccounts
+    .filter((account) => `${account.teamName} ${account.leaderName} ${(account.players || []).map((player) => player.name).join(' ')}`.toLocaleLowerCase().includes(squadSearch.toLocaleLowerCase().trim()))
+    .sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();
     if (!q) return true;
@@ -717,8 +667,9 @@ export const AdminPanelModal: React.FC<Props> = ({
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                   { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
+                  { id: 'squads', label: `Registered Teams (${teamAccounts.length})`, icon: Users },
+                  { id: 'teams', label: `Scrim Entries (${currentTourTeams.length})`, icon: CalendarDays },
                   { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
-                  { id: 'teams', label: `Registered Teams (${currentTourTeams.length})`, icon: Users },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
                   { id: 'history', label: `Match History (${publishedTourResults.length + completedScrims.length})`, icon: HistoryIcon },
                   { id: 'logs', label: `Activity Logs (${logs.length + activityLogs.length})`, icon: ListFilter },
@@ -741,7 +692,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Tournament control</div>
                       <h3 className="mt-1 text-lg font-extrabold text-white">Scrims</h3>
-                      <p className="mt-1 text-xs text-slate-400">Select a scrim to manage teams, results, and settings.</p>
+                      <p className="mt-1 text-xs text-slate-400">Select a scrim to see its registered teams, results, and settings.</p>
                     </div>
                     <button type="button" onClick={() => setShowCreateTour(true)} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-orange-950/25 transition hover:-translate-y-0.5 hover:brightness-110">
                       <Plus size={15} /> New Scrim
@@ -757,7 +708,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="truncate text-sm font-bold text-white">{tour.name}</h4>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); }} className="truncate text-left text-sm font-bold text-white transition hover:text-orange-100">{tour.name}</button>
                                   {selected && <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-orange-200">Selected</span>}
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
@@ -766,19 +717,21 @@ export const AdminPanelModal: React.FC<Props> = ({
                                   {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
                                 </div>
                               </div>
-                              <div className="relative shrink-0">
+                              <div className="flex shrink-0 items-center gap-2">
+                                <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); }} className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] px-3 py-2.5 text-[10px] font-bold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-300/[.1]">Teams · {tour.registeredCount}</button>
+                                <div className="relative">
                                 <button type="button" aria-label={`Actions for ${tour.name}`} aria-expanded={openScrimMenu === tour.id} onClick={() => setOpenScrimMenu((open) => open === tour.id ? null : tour.id)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:bg-orange-300/[.07] hover:text-white"><MoreVertical size={17} /></button>
                                 {openScrimMenu === tour.id && <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl">
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Manage teams</button>
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setTab('tournament'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button>
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setTab('redirect'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button>
-                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('discord'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Server-side Discord relay</button>
                                   <button type="button" disabled={full && tour.status !== 'open'} onClick={() => { void handleToggleRegistration(tour); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06] disabled:opacity-40">{tour.status === 'open' ? 'Close registration' : 'Open registration'}</button>
                                   <button type="button" onClick={() => { void copyRegistrationLink(tour.id); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === tour.id ? 'Link copied' : 'Copy registration link'}</button>
                                   <button type="button" onClick={() => void handleCompleteTournament(tour)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-emerald-200 hover:bg-emerald-300/[.08]">Complete tournament</button>
                                   <div className="my-1 border-t border-white/[.07]" />
                                   <button type="button" onClick={() => { setOpenScrimMenu(null); void handleDeleteTournament(tour.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button>
                                 </div>}
+                                </div>
                               </div>
                             </div>
                           </article>
@@ -786,6 +739,16 @@ export const AdminPanelModal: React.FC<Props> = ({
                       })}
                     </div>
                   )}
+                </section>
+              )}
+
+              {tab === 'squads' && (
+                <section className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad accounts</div><h3 className="mt-1 text-lg font-extrabold text-white">Registered Teams</h3><p className="mt-1 text-xs text-slate-400">All squads that created an account, whether or not they joined a scrim.</p></div>
+                    <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={squadSearch} onChange={(event) => setSquadSearch(event.target.value)} placeholder="Search team or IGN" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
+                  </div>
+                  {visibleSquadAccounts.length ? <div className="grid gap-3 lg:grid-cols-2">{visibleSquadAccounts.map((account, index) => <article key={account.id} className="wallet-card rounded-2xl border border-white/[.08] bg-[#151720] p-4" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}><div className="flex items-start gap-3"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{account.teamLogo ? <img src={account.teamLogo} alt={`${account.teamName} logo`} className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-200">{account.teamName.slice(0, 2).toUpperCase()}</span>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h4 className="truncate text-sm font-extrabold text-white">{account.teamName}</h4><span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${account.status === 'banned' || account.status === 'rejected' ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200'}`}>{account.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{account.leaderName}</strong></div><div className="mt-3 flex flex-wrap gap-1.5">{(account.players || []).map((player) => <span key={`${account.id}-${player.slotIndex}`} className="rounded-lg border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div><div className="mt-2 text-[9px] text-slate-600">Created {new Date(account.createdAt).toLocaleDateString()}</div></div></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{teamAccounts.length ? 'No squad matches that search.' : 'Squads will appear here as soon as they create an account.'}</div>}
                 </section>
               )}
 
@@ -807,28 +770,12 @@ export const AdminPanelModal: React.FC<Props> = ({
               {/* TAB 1: OVERVIEW */}
               {tab === 'overview' && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Organizer workspace</div><h3 className="mt-1 text-lg font-extrabold text-white">Overview</h3></div><div className="relative"><button type="button" aria-label="Overview settings" aria-expanded={openOverviewMenu} onClick={() => setOpenOverviewMenu((open) => !open)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:text-white"><MoreVertical size={17} /></button>{openOverviewMenu && <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { setTab('tournament'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { setTab('redirect'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">CG Group link</button><button type="button" onClick={() => { setTab('discord'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Server-side Discord relay</button></div>}</div></div>
+                  <div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Organizer workspace</div><h3 className="mt-1 text-lg font-extrabold text-white">Overview</h3></div><div className="relative"><button type="button" aria-label="Overview settings" aria-expanded={openOverviewMenu} onClick={() => setOpenOverviewMenu((open) => !open)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:text-white"><MoreVertical size={17} /></button>{openOverviewMenu && <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { setTab('tournament'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { setTab('redirect'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">CG Group link</button><button type="button" onClick={() => { setTab('discord'); setOpenOverviewMenu(false); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Discord event logs</button></div>}</div></div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
-                      <div className="text-xs text-gray-400">Total Scrims</div>
-                      <div className="text-2xl font-bold text-white mt-1">{tournaments.length}</div>
-                    </div>
-                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
-                      <div className="text-xs text-gray-400">Registered Teams</div>
-                      <div className="text-2xl font-bold text-indigo-400 mt-1">{currentTourTeams.length}</div>
-                    </div>
-                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
-                      <div className="text-xs text-gray-400">Remaining Slots</div>
-                      <div className="text-2xl font-bold text-emerald-400 mt-1">
-                        {Math.max(0, currentTour.maxTeams - currentTour.registeredCount)}
-                      </div>
-                    </div>
-                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
-                      <div className="text-xs text-gray-400">Total Players</div>
-                      <div className="text-2xl font-bold text-purple-400 mt-1">
-                        {currentTourTeams.length * 5} / {currentTour.maxTeams * 5}
-                      </div>
-                    </div>
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]"><div className="text-xs text-gray-400">Live Scrims</div><div className="text-2xl font-bold text-white mt-1">{activeScrims.length}</div></div>
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]"><div className="text-xs text-gray-400">Teams in Live Scrims</div><div className="text-2xl font-bold text-indigo-400 mt-1">{liveRegisteredTeamCount}</div></div>
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]"><div className="text-xs text-gray-400">Live Slots Left</div><div className="text-2xl font-bold text-emerald-400 mt-1">{liveRemainingSlotCount}</div></div>
+                    <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]"><div className="text-xs text-gray-400">Players in Live Scrims</div><div className="text-2xl font-bold text-purple-400 mt-1">{livePlayerCount}</div></div>
                   </div>
 
                   {newlyCreatedRegistrationLink && (
@@ -897,6 +844,7 @@ export const AdminPanelModal: React.FC<Props> = ({
               {/* TAB 2: TEAMS MANAGEMENT */}
               {tab === 'teams' && (
                 <div className="space-y-4">
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Scrim entries</div><h3 className="mt-1 text-lg font-extrabold text-white">{currentTour.name}</h3><p className="mt-1 text-xs text-slate-400">Teams registered for this scrim: {currentTourTeams.length}.</p></div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <input
                       type="text"
@@ -1413,67 +1361,20 @@ export const AdminPanelModal: React.FC<Props> = ({
                 </form>
               )}
 
-              {/* TAB 5: DISCORD WEBHOOK RELAY (Requirement 6) */}
+              {/* TAB 5: DISCORD EVENT LOGS */}
               {tab === 'discord' && (
-                <div className="space-y-4 max-w-xl">
-                  <div className="bg-[#15161d] p-4 rounded-xl border border-[#272833]">
-                    <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                      <Send size={14} /> Server-Side Discord Relay
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      Teams registered on the website trigger an instant Discord embed notification with Registration ID, team name, leader UID, and remaining slots. The webhook URL is kept safely on the backend relay server and never exposed to client JavaScript.
-                    </p>
+                <div className="space-y-4">
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-indigo-200">Secure webhook routing</div><h3 className="mt-1 text-lg font-extrabold text-white">Discord Event Logs</h3><p className="mt-1 text-xs text-slate-400">Event channels are configured server-side; webhook URLs are never shown in the app.</p></div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      ['Tournament created', 'Create log channel'],
+                      ['Tournament deleted', 'Delete log channel'],
+                      ['Squad account created', 'Squad registration log channel'],
+                      ['Scrim team registered', 'Tournament registration log channel'],
+                      ['Wallet top-up requested / credited', 'Add money log channel'],
+                      ['Paid entry fee deducted', 'Tournament fee log channel'],
+                    ].map(([event, channel], index) => <div key={event} className="wallet-card flex items-center gap-3 rounded-xl border border-white/[.07] bg-[#151720] p-3" style={{ animationDelay: `${index * 45}ms` }}><CheckCircle2 size={16} className="shrink-0 text-emerald-300"/><div><div className="text-xs font-bold text-white">{event}</div><div className="mt-1 text-[10px] text-slate-500">{channel}</div></div></div>)}
                   </div>
-
-                  {discordMasked && (
-                    <div className="bg-[#0d0e13] border border-[#25262f] p-3 rounded-xl text-xs flex items-center justify-between">
-                      <div>
-                        <span className="text-gray-400">Current Webhook:</span>{' '}
-                        <span className="text-emerald-400 font-mono font-medium">{discordMasked}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                        ACTIVE
-                      </span>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSaveDiscord} className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">
-                        Discord Channel Webhook URL
-                      </label>
-                      <input
-                        type="password"
-                        placeholder="https://discord.com/api/webhooks/..."
-                        value={discordWebhookUrl}
-                        onChange={(e) => setDiscordWebhookUrl(e.target.value)}
-                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-colors"
-                      >
-                        Save Webhook URL
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleTestDiscord}
-                        disabled={discordTestLoading}
-                        className="px-4 py-2 bg-[#22232c] hover:bg-[#2c2d39] text-indigo-300 font-semibold rounded-xl text-xs transition-colors"
-                      >
-                        {discordTestLoading ? 'Sending Test...' : 'Send Test Notification'}
-                      </button>
-                    </div>
-                  </form>
-
-                  {discordTestStatus && (
-                    <div className="p-3 bg-[#0d0e13] border border-[#282934] rounded-xl text-xs text-white">
-                      {discordTestStatus}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1483,6 +1384,8 @@ export const AdminPanelModal: React.FC<Props> = ({
                   <div className="text-xs text-gray-400">
                     Team registration, Discord delivery, tournament changes, team moderation, match results, and admin actions:
                   </div>
+
+                  {logsError && <div role="alert" className="rounded-xl border border-rose-300/20 bg-rose-300/[.06] p-3 text-xs text-rose-200">Registration logs could not load: {logsError}</div>}
 
                   {logs.length === 0 && activityLogs.length === 0 ? (
                     <div className="bg-[#15161d] p-8 rounded-xl text-center text-gray-400 text-xs">

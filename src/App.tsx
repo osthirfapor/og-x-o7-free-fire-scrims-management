@@ -31,7 +31,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Tournament, Team, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
+import { Tournament, Team, TeamAccount, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
 import {
   subscribeTournaments,
   subscribeTeams,
@@ -41,6 +41,7 @@ import {
   findRegisteredTeamProfile,
   saveTeamProfile,
   subscribeTeamWallet,
+  subscribeTeamAccounts,
 } from './services/tournamentService';
 import { LeaderboardView } from './components/LeaderboardView';
 import { testConnection } from './lib/firebase';
@@ -82,6 +83,7 @@ function MainApp() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
   const currentTeams = useMemo(
     () => allTeams.filter((team) => team.tournamentId === activeTournament?.id),
     [allTeams, activeTournament?.id]
@@ -232,6 +234,8 @@ function MainApp() {
     const unsub = subscribeMatchResults((data) => setMatchResults(data));
     return () => unsub();
   }, []);
+
+  useEffect(() => subscribeTeamAccounts((accounts) => setTeamAccounts(accounts)), []);
 
   useEffect(() => {
     if (!teamProfile) {
@@ -865,6 +869,7 @@ function MainApp() {
           {activeTab === 'player_search' && (
             <PlayerSearchView
               teams={allTeams}
+              accounts={teamAccounts}
               tournaments={tournaments}
               matchResults={publishedResults}
             />
