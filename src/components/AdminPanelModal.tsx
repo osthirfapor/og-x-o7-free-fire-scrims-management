@@ -65,7 +65,12 @@ interface Props {
   standalone?: boolean;
 }
 
-const MAP_OPTIONS = ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NexTerra'];
+const MAP_OPTIONS = ['Purgatory', 'Alpine', 'NexTerra'];
+const DEFAULT_MAP = MAP_OPTIONS[0];
+const cleanMapSelection = (value?: string) => {
+  const valid = (value || '').split(',').map((item) => item.trim()).filter((item) => MAP_OPTIONS.includes(item));
+  return valid.length ? valid.join(', ') : DEFAULT_MAP;
+};
 
 export const AdminPanelModal: React.FC<Props> = ({
   tournaments,
@@ -96,7 +101,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourMaxTeams, setTourMaxTeams] = useState(currentTour.maxTeams);
   const [tourEntryFee, setTourEntryFee] = useState(currentTour.entryFee || '');
   const [tourStatus, setTourStatus] = useState(currentTour.status);
-  const [tourMap, setTourMap] = useState(currentTour.map || 'Bermuda');
+  const [tourMap, setTourMap] = useState(cleanMapSelection(currentTour.map));
   const [tourCardImage, setTourCardImage] = useState(currentTour.cardImageUrl || '');
   const [saveTourSuccess, setSaveTourSuccess] = useState(false);
 
@@ -117,7 +122,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourDate, setNewTourDate] = useState('');
   const [newTourTime, setNewTourTime] = useState('18:00 UTC');
   const [newTourMax, setNewTourMax] = useState(12);
-  const [newTourMap, setNewTourMap] = useState<string[]>(['Bermuda']);
+  const [newTourMap, setNewTourMap] = useState<string[]>([DEFAULT_MAP]);
   const [newTourCategory, setNewTourCategory] = useState<'practice' | 'free' | 'paid'>('practice');
   const [newTourEntryFee, setNewTourEntryFee] = useState('');
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
@@ -166,7 +171,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourMaxTeams(activeTournament.maxTeams);
     setTourEntryFee(activeTournament.entryFee || '');
     setTourStatus(activeTournament.status);
-    setTourMap(activeTournament.map || 'Bermuda');
+    setTourMap(cleanMapSelection(activeTournament.map));
     setTourCardImage(activeTournament.cardImageUrl || '');
     setRedirectLink(activeTournament.redirectLink || '');
     setRedirectEnabled(activeTournament.redirectLinkEnabled ?? true);
@@ -238,7 +243,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourMaxTeams(tour.maxTeams);
     setTourEntryFee(tour.entryFee || '');
     setTourStatus(tour.status);
-    setTourMap(tour.map || 'Bermuda');
+    setTourMap(cleanMapSelection(tour.map));
     setTourCardImage(tour.cardImageUrl || '');
     setRedirectLink(tour.redirectLink || '');
     setRedirectEnabled(tour.redirectLinkEnabled ?? true);
@@ -346,7 +351,7 @@ export const AdminPanelModal: React.FC<Props> = ({
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
         maxTeams: Number(newTourMax) || 12,
-        map: newTourMap.join(', ') || 'Bermuda',
+        map: newTourMap.join(', ') || DEFAULT_MAP,
         redirectLink: newTourGroupLink.trim(),
         redirectLinkEnabled: Boolean(newTourGroupLink.trim()),
         redirectButtonText: 'Join Official Discord Lounge',
@@ -360,7 +365,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       setNewTourEntryFee('');
       setNewTourGroupLink('');
       setNewTourCardImage('');
-      setNewTourMap(['Bermuda']);
+      setNewTourMap([DEFAULT_MAP]);
       alert('New tournament scrim successfully created!');
     } catch (err: any) {
       alert(`Failed to create tournament: ${err.message}`);
@@ -735,7 +740,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
                                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                                  <span>{tour.date} · {tour.time}</span><span>{tour.map || 'Bermuda'}</span><span>{tour.registeredCount}/{tour.maxTeams} teams</span>
+                                  <span>{tour.date} · {tour.time}</span><span>{tour.registeredCount}/{tour.maxTeams} teams</span>
                                   {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
                                 </div>
                               </div>
@@ -865,7 +870,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <div>
                             <div className="font-bold text-white text-sm">{t.name}</div>
                             <div className="text-gray-400 mt-0.5">
-                              {t.date} • {t.time} • Map: {t.map || 'Bermuda'}
+                              {t.date} • {t.time}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1193,7 +1198,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                         const placements = publishedTourResults.filter((result) => result.tournamentId === tour.id).sort((a, b) => a.position - b.position || b.kills - a.kills);
                         return <article key={tour.id} className="overflow-hidden rounded-2xl border border-[#282934] bg-[#15161d]">
                           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[.06] px-4 py-3">
-                            <div><h4 className="text-sm font-extrabold text-white">{tour.name}</h4><p className="mt-1 text-[10px] text-slate-500">{tour.date} · {tour.time} · {tour.map || 'Bermuda'} · {placements.length} result{placements.length === 1 ? '' : 's'}</p></div>
+                            <div><h4 className="text-sm font-extrabold text-white">{tour.name}</h4><p className="mt-1 text-[10px] text-slate-500">{tour.date} · {tour.time} · {placements.length} result{placements.length === 1 ? '' : 's'}</p></div>
                             <button type="button" onClick={() => { if (confirm(`Delete ${tour.name} and its registrations/results permanently?`)) void handleDeleteTournament(tour.id); }} className="rounded-lg border border-rose-300/15 px-3 py-2 text-[10px] font-bold text-rose-200 transition hover:bg-rose-300/[.08]">Delete tournament</button>
                           </div>
                           {placements.length ? <div className="divide-y divide-white/[.05]">{placements.map((result) => <div key={result.id} className="flex items-center justify-between gap-3 px-4 py-2.5"><div className="flex min-w-0 items-center gap-3"><span className={`w-8 text-center text-xs font-black ${result.position === 1 ? 'text-amber-200' : 'text-slate-400'}`}>{result.position === 1 ? <Crown size={15} className="mx-auto" /> : `#${result.position}`}</span><span className="truncate text-xs font-bold text-white">{result.teamName}</span></div><div className="flex shrink-0 items-center gap-3 text-[10px] text-slate-400"><span>{result.kills} kills</span><span>{result.points} pts</span>{(result.earnings || 0) > 0 && <span className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</span>}</div></div>)}</div> : <div className="px-4 py-5 text-xs text-slate-500">No published placements were recorded for this tournament.</div>}

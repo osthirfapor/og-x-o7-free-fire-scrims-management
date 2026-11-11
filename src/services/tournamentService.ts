@@ -428,7 +428,7 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     redirectLink: data.redirectLink ?? '',
     redirectLinkEnabled: data.redirectLinkEnabled ?? true,
     redirectButtonText: data.redirectButtonText || 'Join WhatsApp / Discord Group',
-    map: data.map || 'Bermuda',
+    map: data.map || 'Purgatory',
     entryFee: data.entryFee || '',
     entryFeeAmount: Number(data.entryFeeAmount ?? data.entryFee ?? 0) || 0,
     prizePool: data.prizePool || '',

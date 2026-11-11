@@ -61,9 +61,6 @@ const CARD_BACKGROUNDS: Record<string, string> = {
   practice: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
   free: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=600&auto=format&fit=crop&q=80',
   paid: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80',
-  bermuda: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
-  purgatory: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=600&auto=format&fit=crop&q=80',
-  kalahari: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80',
 };
 
 function MainApp() {
@@ -624,13 +621,12 @@ function MainApp() {
                       const isRegistered = myRegistrations.some((registration) => registration.tournament.id === tour.id);
                       const entryFee = tour.category === 'paid' ? Number(tour.entryFeeAmount ?? tour.entryFee ?? 0) : 0;
                       const remainingSlots = Math.max(0, tour.maxTeams - tour.registeredCount);
+                      const filledPercent = tour.maxTeams > 0 ? Math.min(100, (tour.registeredCount / tour.maxTeams) * 100) : 0;
 
                       // Background artwork selection
                       const bgImg =
                         tour.cardImageUrl ||
-                        CARD_BACKGROUNDS[tour.category] ||
-                        CARD_BACKGROUNDS[tour.map?.toLowerCase() || 'bermuda'] ||
-                        CARD_BACKGROUNDS.practice;
+                        CARD_BACKGROUNDS[tour.category] || CARD_BACKGROUNDS.practice;
 
                       return (
                         <div
@@ -671,24 +667,11 @@ function MainApp() {
                                 : 'PRACTICE'}
                             </span>
 
-                            <span
-                              className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isFull
-                                  ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                                  : isOpen
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                  : 'bg-gray-500/20 text-gray-300 border-gray-500/40'
-                              }`}
-                            >
-                              {isFull ? 'FULL' : `${remainingSlots} LEFT`}
-                            </span>
+                            <span className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full border ${isOpen ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-gray-500/20 text-gray-300 border-gray-500/40'}`}>{isOpen ? 'OPEN' : 'CLOSED'}</span>
                           </div>
 
                           {/* Center Scrim Details */}
                           <div className="relative z-10 text-center py-1">
-                            <div className="text-[10px] font-semibold text-gray-300 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full inline-block mb-1 border border-white/10">
-                              {tour.map || 'Bermuda'} • {tour.registeredCount}/{tour.maxTeams} Teams
-                            </div>
                             <div className="text-[10px] text-gray-400">
                               {tour.date} ({tour.time})
                             </div>
@@ -732,6 +715,10 @@ function MainApp() {
                                   View Teams
                                 </button>
                               )}
+                            </div>
+                            <div className="mt-2 space-y-1.5 text-[9px] sm:text-[10px]">
+                              <div className="flex items-center justify-between gap-2 font-semibold"><span className="text-slate-300">{tour.registeredCount}/{tour.maxTeams} teams</span><span className={remainingSlots ? 'text-emerald-300' : 'text-rose-300'}>{remainingSlots} {remainingSlots === 1 ? 'slot' : 'slots'} left</span></div>
+                              <div role="progressbar" aria-label={`${tour.name} registration slots`} aria-valuemin={0} aria-valuemax={tour.maxTeams} aria-valuenow={tour.registeredCount} className="h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/50"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-indigo-400 transition-[width] duration-700 ease-out" style={{ width: `${filledPercent}%` }} /></div>
                             </div>
                           </div>
                         </div>
@@ -834,7 +821,7 @@ function MainApp() {
             <section className="space-y-4">
               <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
               {myRegistrations.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><CalendarDays size={26} className="mx-auto text-slate-600" /><h3 className="mt-3 text-sm font-bold text-white">No registrations yet</h3><p className="mt-1 text-xs text-slate-500">When your squad registers, tournaments will appear here.</p><button type="button" onClick={() => setActiveTab('tournaments')} className="mt-4 rounded-xl bg-indigo-500/15 px-4 py-2 text-xs font-bold text-indigo-200">Explore open tournaments</button></div> : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span><span>{tournament.map || 'Bermuda'}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
               )}
             </section>
           )}

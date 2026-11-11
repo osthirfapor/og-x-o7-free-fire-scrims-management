@@ -58,13 +58,12 @@ export const RegisteredTeamsView: React.FC<Props> = ({
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
               Garena Free Fire Scrims
             </span>
-            <span className="text-xs text-gray-400">Map: {tournament.map || 'Bermuda'}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
             {tournament.name}
           </h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            Schedule: <span className="text-gray-200 font-medium">{tournament.date} at {tournament.time}</span> • Capacity: 12 Teams
+            Schedule: <span className="text-gray-200 font-medium">{tournament.date} at {tournament.time}</span> • Capacity: {tournament.maxTeams} Teams
           </p>
         </div>
 
