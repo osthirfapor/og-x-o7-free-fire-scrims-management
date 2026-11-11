@@ -145,8 +145,9 @@ function MainApp() {
         if (!cancelled) setTeamProfile(verifiedProfile);
       })
       .catch((error) => {
-        console.error('Could not verify the saved squad session:', error);
-        if (!cancelled) setTeamProfile(null);
+        // A temporary Firestore/network failure must not erase a valid saved
+        // browser session; keep the current profile and retry on a later load.
+        console.warn('Could not verify the saved squad session; keeping the local session:', error);
       })
       .finally(() => {
         if (!cancelled) setCheckingTeamSession(false);

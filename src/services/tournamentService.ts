@@ -746,9 +746,10 @@ export function getLocalTeamProfile(): TeamProfile | null {
     const raw = localStorage.getItem(TEAM_PROFILE_LOCAL_KEY);
     if (!raw) return null;
     const profile = JSON.parse(raw) as TeamProfile;
-    // Old profiles were self-created in the browser. Only keep sessions tied
-    // to a squad that was registered through the admin-managed team list.
-    return profile.registrationId ? profile : null;
+    // Account-based squads have a stable account_ ID instead of a tournament
+    // registration ID. Keep both legitimate session types across reloads.
+    const hasRegisteredAccount = typeof profile.userId === 'string' && profile.userId.startsWith('account_');
+    return profile.registrationId || hasRegisteredAccount ? profile : null;
   } catch (e) {
     console.error('Failed to parse local team profile:', e);
     return null;
