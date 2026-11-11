@@ -32,7 +32,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
+import { Tournament, Team, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
 import { RegistrationModal } from './RegistrationModal';
 import {
   createTournament,
@@ -50,8 +50,6 @@ import {
   calcPoints,
   buildLeaderboard,
   publishTournamentResults,
-  subscribeTeamAccounts,
-  updateTeamAccountStatus,
   creditTeamWallet,
   subscribeTeamWallets,
   subscribeTeams,
@@ -90,7 +88,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'scrims' | 'accounts' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -144,7 +142,6 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
-  const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
   const [allRegisteredTeams, setAllRegisteredTeams] = useState<Team[]>([]);
   const [walletTeamSearch, setWalletTeamSearch] = useState('');
   const [teamWallets, setTeamWallets] = useState<TeamWallet[]>([]);
@@ -187,7 +184,6 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (!isAdmin) {
       setLogs([]);
       setActivityLogs([]);
-      setTeamAccounts([]);
       setTeamWallets([]);
       setResults([]);
       return;
@@ -206,13 +202,11 @@ export const AdminPanelModal: React.FC<Props> = ({
       setLogs(fetchedLogs);
     });
     const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
-    const unsubAccounts = subscribeTeamAccounts((items) => setTeamAccounts(items));
     const unsubWallets = subscribeTeamWallets((items) => setTeamWallets(items));
     const unsubResults = subscribeMatchResults((r) => setResults(r));
     return () => {
       unsubLogs();
       unsubActivity();
-      unsubAccounts();
       unsubWallets();
       unsubResults();
     };
@@ -430,18 +424,6 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
-  const handleTeamAccountStatus = async (account: TeamAccount, status: TeamAccount['status']) => {
-    try {
-      if (status === 'banned') await setTeamBanned(account.teamName, true);
-      if (account.status === 'banned' && status !== 'banned') await setTeamBanned(account.teamName, false);
-      await updateTeamAccountStatus(account.id, status);
-      void writeAdminActivityLog({ eventType: status === 'banned' ? 'team_banned' : status === 'approved' ? 'team_account_approved' : status === 'rejected' ? 'team_account_rejected' : 'team_unbanned', summary: `${account.teamName} account request marked ${status}.`, teamName: account.teamName }).catch((error) => console.warn('Could not save admin activity log:', error));
-    } catch (error) {
-      if (status === 'banned') await setTeamBanned(account.teamName, false).catch(() => undefined);
-      alert(error instanceof Error ? error.message : 'Could not update team account.');
-    }
-  };
-
   const handleWalletCredit = async (event: React.FormEvent) => {
     event.preventDefault();
     setWalletCreditMessage(null);
@@ -599,7 +581,6 @@ export const AdminPanelModal: React.FC<Props> = ({
   const activeScrims = tournaments.filter((tournament) => tournament.status !== 'completed');
   const tournamentsWithSlots = activeScrims;
   const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
-  const pendingTeamAccounts = teamAccounts.filter((account) => account.status === 'pending').length;
   const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
   const registeredWalletTeamNames = Array.from(new Set(allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
@@ -716,7 +697,6 @@ export const AdminPanelModal: React.FC<Props> = ({
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                   { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
-                  { id: 'accounts', label: `Account Requests (${pendingTeamAccounts})`, icon: Users },
                   { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
                   { id: 'teams', label: `Registered Teams (${currentTourTeams.length})`, icon: Users },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
@@ -784,35 +764,6 @@ export const AdminPanelModal: React.FC<Props> = ({
                           </article>
                         );
                       })}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {tab === 'accounts' && (
-                <section className="space-y-4">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[.18em] text-orange-200">Independent of tournament openings</div>
-                    <h3 className="mt-1 text-lg font-extrabold text-white">Team Account Requests</h3>
-                    <p className="mt-1 text-xs text-slate-400">Approve a squad here so its captain can log in before or between tournaments.</p>
-                  </div>
-                  {teamAccounts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">No team account requests yet.</div> : (
-                    <div className="space-y-2.5">
-                      {teamAccounts.map((account) => (
-                        <article key={account.id} className="rounded-2xl border border-[#282934] bg-[#15161d] p-4">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="flex min-w-0 items-start gap-3">
-                              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{account.teamLogo ? <img src={account.teamLogo} alt="" className="h-full w-full object-cover" /> : <Gamepad2 size={20} className="m-3 text-slate-500" />}</div>
-                              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="text-sm font-bold text-white">{account.teamName}</h4><span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${account.status === 'approved' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : account.status === 'banned' || account.status === 'rejected' ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>{account.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{account.leaderName}</strong></div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">{account.players.map((player) => <span key={`${account.id}-${player.slotIndex}`}>{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`}: {player.name}</span>)}</div><div className="mt-1 text-[10px] text-slate-600">Submitted {new Date(account.createdAt).toLocaleString()}</div></div>
-                            </div>
-                            <div className="flex shrink-0 flex-wrap gap-2">
-                              {account.status !== 'approved' && <button type="button" onClick={() => void handleTeamAccountStatus(account, 'approved')} className="rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] px-3 py-2 text-[10px] font-bold text-emerald-200">Approve</button>}
-                              {account.status !== 'rejected' && account.status !== 'banned' && <button type="button" onClick={() => void handleTeamAccountStatus(account, 'rejected')} className="rounded-lg border border-rose-300/20 bg-rose-300/[.06] px-3 py-2 text-[10px] font-bold text-rose-200">Reject</button>}
-                              <button type="button" onClick={() => { if (account.status === 'banned') void handleTeamAccountStatus(account, 'rejected'); else if (confirm(`Ban ${account.teamName} from all future registrations?`)) void handleTeamAccountStatus(account, 'banned'); }} className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-[10px] font-bold text-slate-300">{account.status === 'banned' ? 'Unban' : 'Ban team'}</button>
-                            </div>
-                          </div>
-                        </article>
-                      ))}
                     </div>
                   )}
                 </section>

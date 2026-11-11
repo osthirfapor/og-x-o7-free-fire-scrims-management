@@ -100,7 +100,6 @@ function MainApp() {
   const [showWallet, setShowWallet] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showTeamAccountRegistration, setShowTeamAccountRegistration] = useState(false);
-  const [teamAccountSubmitted, setTeamAccountSubmitted] = useState<string | null>(null);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
   const [isAdminPage, setIsAdminPage] = useState(() => ADMIN_PANEL_ENABLED && new URLSearchParams(window.location.search).get('panel') === 'admin');
   const handledRegistrationLink = useRef(false);
@@ -160,8 +159,8 @@ function MainApp() {
     if (!requestedTournament) return;
     handledRegistrationLink.current = true;
     setActiveTournament(requestedTournament);
-    // A direct link should land new visitors at login. Only an approved, logged-in
-    // squad is taken straight into tournament registration.
+    // A direct link should land new visitors at login. A logged-in squad can
+    // continue straight into tournament registration.
     setShowRegModal(Boolean(teamProfile) && requestedTournament.status === 'open' && requestedTournament.registeredCount < requestedTournament.maxTeams);
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('register');
@@ -174,7 +173,7 @@ function MainApp() {
     if (myRegistrations.some((registration) => registration.tournament.id === target.id)) return;
     const fee = target.category === 'paid' ? Number(target.entryFeeAmount ?? target.entryFee ?? 0) : 0;
     if (fee > walletBalance) {
-      alert(`Insufficient wallet balance. This tournament needs ৳${fee}; your balance is ৳${walletBalance}. Ask the organizer to add funds.`);
+      alert(`You don't have enough money to join this paid tournament. Entry fee: ৳${fee}; your wallet: ৳${walletBalance}. Open Wallet → Add Money to request a top-up.`);
       return;
     }
     if (tour) setActiveTournament(tour);
@@ -355,7 +354,7 @@ function MainApp() {
     return (
       <main className="app-shell flex min-h-screen items-center justify-center p-6 text-white">
         <div className="login-panel flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111218]/90 px-5 py-4 text-sm text-slate-300 shadow-2xl">
-          <span className="h-2 w-2 animate-ping rounded-full bg-cyan-300" /> Verifying your approved squad access…
+          <span className="h-2 w-2 animate-ping rounded-full bg-cyan-300" /> Opening your squad profile…
         </div>
       </main>
     );
@@ -366,21 +365,28 @@ function MainApp() {
       <>
         <TeamLoginGate
           onLoginSuccess={(profile) => {
-          setShowSuccessModal(false);
-          setRegisteredSuccessTeam(null);
-            setTeamAccountSubmitted(null);
+            setShowSuccessModal(false);
+            setRegisteredSuccessTeam(null);
             setTeamProfile(profile);
           }}
           onOpenAdminSecret={openAdminPage}
-          onRegister={() => { setTeamAccountSubmitted(null); setShowTeamAccountRegistration(true); }}
-          registrationSubmitted={teamAccountSubmitted}
+          onRegister={() => setShowTeamAccountRegistration(true)}
         />
         {showTeamAccountRegistration && (
           <TeamAccountRegistrationModal
             onClose={() => setShowTeamAccountRegistration(false)}
             onSuccess={(account) => {
               setShowTeamAccountRegistration(false);
-              setTeamAccountSubmitted(account.teamName);
+              const profile: TeamProfile = {
+                userId: account.id,
+                teamName: account.teamName,
+                teamLogo: account.teamLogo,
+                leaderName: account.leaderName,
+                players: account.players,
+                updatedAt: account.updatedAt,
+              };
+              void saveTeamProfile(profile);
+              setTeamProfile(profile);
             }}
           />
         )}
@@ -706,7 +712,7 @@ function MainApp() {
                                 </button>
                               ) : isOpen && !isFull && !PUBLIC_READ_ONLY && entryFee > walletBalance ? (
                                 <button type="button" onClick={(e) => { e.stopPropagation(); setShowWallet(true); }} className="w-full py-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[.07] text-amber-100 font-bold text-[10px] sm:text-xs">
-                                  Need ৳{entryFee} · Wallet ৳{walletBalance}
+                                  Not enough money · ৳{entryFee} needed
                                 </button>
                               ) : isOpen && !isFull && !PUBLIC_READ_ONLY ? (
                                 <button

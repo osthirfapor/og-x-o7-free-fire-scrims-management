@@ -7,10 +7,9 @@ interface Props {
   onLoginSuccess: (profile: TeamProfile) => void;
   onOpenAdminSecret?: () => void;
   onRegister?: () => void;
-  registrationSubmitted?: string | null;
 }
 
-export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister, registrationSubmitted }) => {
+export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecret, onRegister }) => {
   const existing = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(existing?.teamName || '');
   const [leaderName, setLeaderName] = useState(existing?.leaderName || '');
@@ -70,7 +69,7 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
               Your next <span className="text-gradient">Booyah</span> starts here.
             </h1>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">
-              Sign in with your approved squad details to explore tournaments, standings, and player stats.
+              Sign in with your squad details to explore tournaments, standings, and player stats.
             </p>
           </div>
           <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-5 text-[11px] text-slate-500">
@@ -94,12 +93,10 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/15 bg-cyan-300/10 text-cyan-200">
               <KeyRound size={20} />
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-300">Registered squads only</p>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-300">Squad access</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Welcome back, Captain</h2>
             <p className="mt-2 text-xs leading-5 text-slate-400">Enter your registered team details.</p>
           </div>
-
-          {registrationSubmitted && <div className="mb-4 rounded-xl border border-emerald-300/20 bg-emerald-300/[.06] px-3.5 py-3 text-xs leading-5 text-emerald-100"><strong>{registrationSubmitted}</strong> sent for review. Login will work after organizer approval.</div>}
 
           {error && (
             <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-xs leading-5 text-rose-200">

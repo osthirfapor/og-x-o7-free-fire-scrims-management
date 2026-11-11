@@ -103,7 +103,7 @@ export async function createTeamAccount(params: { teamName: string; teamLogo: st
     teamLogo: params.teamLogo,
     leaderName,
     players: params.players.map((player) => ({ ...player, name: player.name.trim() })),
-    status: 'pending',
+    status: 'approved',
     createdAt: now,
     updatedAt: now,
   };
@@ -269,7 +269,7 @@ export async function registerTeam(params: {
       const walletSnapshot = await transaction.get(walletRef);
       if (walletSnapshot.exists()) walletData = { id: walletSnapshot.id, ...(walletSnapshot.data() as Omit<TeamWallet, 'id'>) };
       if (!walletData || walletData.balance < requiredFee) {
-        throw new Error(`Insufficient wallet balance. This tournament needs ৳${requiredFee}; contact the organizer to add funds.`);
+        throw new Error(`You don't have enough money to join this paid tournament. Entry fee: ৳${requiredFee}; your wallet: ৳${walletData?.balance ?? 0}. Open Wallet → Add Money to request a top-up.`);
       }
       if (walletData.teamName !== teamName.trim()) throw new Error(`Use the registered team name exactly as shown in your profile to use its wallet.`);
     }
@@ -685,19 +685,19 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
   const normalizedLeader = leaderName.trim().toLocaleLowerCase();
   if (await isTeamNameBanned(teamName)) return null;
   const accountSnapshot = await getDocs(collection(db, 'team_accounts'));
-  const approvedAccount = accountSnapshot.docs
+  const activeAccount = accountSnapshot.docs
     .map((item) => ({ id: item.id, ...(item.data() as Omit<TeamAccount, 'id'>) }))
-    .find((account) => account.status === 'approved'
+    .find((account) => (account.status === 'approved' || account.status === 'pending')
       && account.teamName.trim().toLocaleLowerCase() === normalizedTeam
       && account.leaderName.trim().toLocaleLowerCase() === normalizedLeader);
-  if (approvedAccount) {
+  if (activeAccount) {
     return {
-      userId: approvedAccount.id,
-      teamName: approvedAccount.teamName,
-      teamLogo: approvedAccount.teamLogo,
-      leaderName: approvedAccount.leaderName,
-      players: approvedAccount.players,
-      updatedAt: approvedAccount.updatedAt,
+      userId: activeAccount.id,
+      teamName: activeAccount.teamName,
+      teamLogo: activeAccount.teamLogo,
+      leaderName: activeAccount.leaderName,
+      players: activeAccount.players,
+      updatedAt: activeAccount.updatedAt,
     };
   }
   const tournamentSnapshot = await getDocs(collection(db, 'tournaments'));
