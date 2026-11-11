@@ -400,9 +400,19 @@ function MainApp() {
         {showTeamAccountRegistration && (
           <TeamAccountRegistrationModal
             onClose={() => setShowTeamAccountRegistration(false)}
-            onSuccess={(account) => {
+            onSuccess={async (account) => {
+              const profile: TeamProfile = {
+                userId: account.id,
+                teamName: account.teamName,
+                teamLogo: account.teamLogo,
+                leaderName: account.leaderName,
+                players: account.players,
+                updatedAt: account.updatedAt,
+              };
+              await saveTeamProfile(profile);
               setShowTeamAccountRegistration(false);
-              setNewAccountCredentials({ teamName: account.teamName, leaderName: account.leaderName });
+              setNewAccountCredentials(null);
+              setTeamProfile(profile);
             }}
           />
         )}
