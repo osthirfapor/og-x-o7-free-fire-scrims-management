@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,67 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+const discordEventWebhooks: Record<string, { env: string; title: string; color: number; adminOnly: boolean }> = {
+  tournament_created: { env: 'DISCORD_TOUR_CREATE_WEBHOOK', title: 'Tournament created', color: 0x22c55e, adminOnly: true },
+  tournament_deleted: { env: 'DISCORD_TOUR_DELETE_WEBHOOK', title: 'Tournament deleted', color: 0xef4444, adminOnly: true },
+  team_account_created: { env: 'DISCORD_SQUAD_REGISTER_WEBHOOK', title: 'Squad account created', color: 0x6366f1, adminOnly: false },
+  tournament_registered: { env: 'DISCORD_TOUR_REGISTER_WEBHOOK', title: 'Tournament registration', color: 0x3b82f6, adminOnly: false },
+  wallet_credited: { env: 'DISCORD_ADD_MONEY_WEBHOOK', title: 'Wallet money added', color: 0xf59e0b, adminOnly: true },
+  wallet_topup_requested: { env: 'DISCORD_ADD_MONEY_WEBHOOK', title: 'Wallet top-up requested', color: 0xf59e0b, adminOnly: false },
+  paid_tournament_fee: { env: 'DISCORD_TOUR_FEE_WEBHOOK', title: 'Paid tournament fee', color: 0xa855f7, adminOnly: false },
+};
+
+async function isAuthorizedAdmin(token: string): Promise<boolean> {
+  const apiKey = process.env.FIREBASE_API_KEY;
+  if (!apiKey) return false;
+  const identity = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }),
+  });
+  if (!identity.ok) return false;
+  const userData = await identity.json() as { users?: Array<{ localId?: string }> };
+  const uid = userData.users?.[0]?.localId;
+  if (!uid) return false;
+  const projectId = 'ai-studio-applet-webapp-9b7f3';
+  const databaseId = 'ai-studio-ogxo7freefirescr-5beaaaf9-c76e-4ff1-8771-509dc493c782';
+  const admin = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${encodeURIComponent(uid)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!admin.ok) return false;
+  const data = await admin.json() as { fields?: { enabled?: { booleanValue?: boolean } } };
+  return data.fields?.enabled?.booleanValue === true;
+}
+
+app.post('/api/discord-event', async (req: Request, res: Response) => {
+  try {
+    const { event, data = {} } = req.body as { event?: string; data?: Record<string, unknown> };
+    const config = event ? discordEventWebhooks[event] : undefined;
+    if (!config) return res.status(400).json({ error: 'Unknown Discord event.' });
+    const webhook = process.env[config.env] || '';
+    if (!webhook) return res.status(503).json({ error: 'Discord event webhook is not configured.' });
+    if (config.adminOnly) {
+      const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || '';
+      if (!token || !await isAuthorizedAdmin(token)) return res.status(401).json({ error: 'Admin access required.' });
+    }
+    const fields = Object.entries(data).slice(0, 20).map(([name, value]) => ({
+      name: String(name).slice(0, 200),
+      value: String(Array.isArray(value) ? value.join(' · ') : value ?? '—').replace(/[\u0000-\u001f]/g, ' ').slice(0, 900),
+      inline: true,
+    }));
+    await sendDiscordEmbed(webhook, {
+      title: config.title,
+      description: '',
+      color: config.color,
+      fields,
+      footer: { text: 'OG x o7 Scrims' },
+      timestamp: new Date().toISOString(),
+    });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Discord event error:', error);
+    return res.status(502).json({ error: 'Could not send Discord event.' });
+  }
+});
 
 // In-memory / fallback store for Discord webhook configuration
 interface AdminConfig {

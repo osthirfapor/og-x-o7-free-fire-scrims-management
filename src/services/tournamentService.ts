@@ -13,6 +13,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendDiscordEvent } from '../lib/discordEvents';
 import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
@@ -108,6 +109,11 @@ export async function createTeamAccount(params: { teamName: string; teamLogo: st
     updatedAt: now,
   };
   await setDoc(doc(db, 'team_accounts', id), account);
+  void sendDiscordEvent('team_account_created', {
+    'Team name': account.teamName,
+    'Captain IGN': account.leaderName,
+    'Players': account.players.map((player) => player.name).join(' · '),
+  });
   return account;
 }
 
@@ -354,36 +360,31 @@ export async function registerTeam(params: {
       nextCount,
       maxTeams: tourData.maxTeams,
       remainingSlots: Math.max(0, tourData.maxTeams - nextCount),
+      paidTournament,
+      requiredFee,
+      walletBalanceAfter: paidTournament && walletData ? Math.round((walletData.balance - requiredFee) * 100) / 100 : null,
     };
   });
 
-  // Relay registration to Discord securely via server-side API
-  let discordDelivered = false;
-  let discordStatus: 'delivered' | 'pending' | 'failed' = 'pending';
-  try {
-    const notifyUrl = typeof window !== 'undefined' ? '/api/discord-notify' : 'http://localhost:3000/api/discord-notify';
-    const notificationResponse = await fetch(notifyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        registrationId,
-        teamName: resultTeam.newTeam.teamName,
-        leaderName: resultTeam.newTeam.leaderName,
-        playerCount: cleanPlayerNames.length,
-        players: cleanPlayerNames,
-        registrationTime: new Date().toLocaleString(),
-        currentRegisteredCount: resultTeam.nextCount,
-        maxTeams: resultTeam.maxTeams,
-        remainingSlots: resultTeam.remainingSlots,
-        tournamentName: tournament.name,
-      }),
+  const discordDelivered = await sendDiscordEvent('tournament_registered', {
+    'Tournament': tournament.name,
+    'Registration ID': registrationId,
+    'Team name': resultTeam.newTeam.teamName,
+    'Captain IGN': resultTeam.newTeam.leaderName,
+    'Players': cleanPlayerNames.join(' · '),
+    'Slots': `${resultTeam.nextCount}/${resultTeam.maxTeams}`,
+    'Remaining slots': resultTeam.remainingSlots,
+    ...(resultTeam.paidTournament ? { 'Entry fee': `৳${resultTeam.requiredFee}` } : {}),
+  });
+  const discordStatus: 'delivered' | 'pending' | 'failed' = discordDelivered ? 'delivered' : 'failed';
+  if (resultTeam.paidTournament && resultTeam.requiredFee > 0) {
+    void sendDiscordEvent('paid_tournament_fee', {
+      'Tournament': tournament.name,
+      'Team name': resultTeam.newTeam.teamName,
+      'Registration ID': registrationId,
+      'Fee deducted': `৳${resultTeam.requiredFee}`,
+      'Wallet balance after entry': `৳${resultTeam.walletBalanceAfter ?? 0}`,
     });
-    const notificationResult = await notificationResponse.json().catch(() => ({}));
-    discordDelivered = notificationResponse.ok && notificationResult.delivered === true;
-    discordStatus = discordDelivered ? 'delivered' : notificationResponse.ok && notificationResult.success ? 'pending' : 'failed';
-    if (!discordDelivered) console.warn('Discord relay returned an error:', notificationResponse.status);
-  } catch (err) {
-    console.error('Error in Discord relay call:', err);
   }
 
   // Record audit log
@@ -440,6 +441,13 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
 
   try {
     await setDoc(doc(db, 'tournaments', id), newTour);
+    void sendDiscordEvent('tournament_created', {
+      'Tournament': newTour.name,
+      'Category': newTour.category,
+      'Entry fee': newTour.category === 'paid' ? `৳${newTour.entryFeeAmount}` : 'Free',
+      'Date': `${newTour.date} · ${newTour.time}`,
+      'Team slots': newTour.maxTeams,
+    });
     return id;
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, `tournaments/${id}`);

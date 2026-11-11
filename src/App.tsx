@@ -44,6 +44,7 @@ import {
 } from './services/tournamentService';
 import { LeaderboardView } from './components/LeaderboardView';
 import { testConnection } from './lib/firebase';
+import { sendDiscordEvent } from './lib/discordEvents';
 import { RegistrationModal } from './components/RegistrationModal';
 import { RegistrationSuccessModal } from './components/RegistrationSuccessModal';
 import { TeamLoginGate } from './components/TeamLoginGate';
@@ -275,6 +276,12 @@ function MainApp() {
   const requestedTopUpAmount = topUpSelection === 'custom' ? Number(customTopUpAmount) : Number(topUpSelection);
   const handleTopUpWhatsApp = () => {
     if (!Number.isFinite(requestedTopUpAmount) || requestedTopUpAmount <= 0 || !teamProfile) return;
+    void sendDiscordEvent('wallet_topup_requested', {
+      'Team name': teamProfile.teamName,
+      'Captain IGN': teamProfile.leaderName,
+      'Requested amount': `৳${requestedTopUpAmount.toLocaleString()}`,
+      'Current wallet': `৳${walletBalance.toLocaleString()}`,
+    });
     const message = [
       'Hi, I need add money to my team wallet.',
       `Team name: ${teamProfile.teamName}`,

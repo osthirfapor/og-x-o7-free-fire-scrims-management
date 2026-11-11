@@ -32,6 +32,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sendDiscordEvent } from '../lib/discordEvents';
 import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, MatchResult } from '../types/tournament';
 import { RegistrationModal } from './RegistrationModal';
 import {
@@ -395,7 +396,13 @@ export const AdminPanelModal: React.FC<Props> = ({
   const handleDeleteTournament = async (id: string) => {
     if (confirm('Are you sure you want to permanently delete this tournament and its registrations?')) {
       try {
+        const removedTournament = tournaments.find((item) => item.id === id);
         await deleteTournament(id);
+        void sendDiscordEvent('tournament_deleted', {
+          'Tournament': removedTournament?.name || id,
+          'Tournament ID': id,
+          'Registered teams': removedTournament?.registeredCount ?? 'unknown',
+        });
         void writeAdminActivityLog({ eventType: 'tournament_deleted', summary: `Deleted tournament ${tournaments.find((item) => item.id === id)?.name || id}.`, tournamentId: id, tournamentName: tournaments.find((item) => item.id === id)?.name }).catch((error) => console.warn('Could not save admin activity log:', error));
       } catch (err: any) {
         alert(`Failed to delete tournament: ${err.message}`);
@@ -434,6 +441,11 @@ export const AdminPanelModal: React.FC<Props> = ({
     setWalletCreditMessage(null);
     try {
       const wallet = await creditTeamWallet(walletTeamName, Number(walletCreditAmount));
+      void sendDiscordEvent('wallet_credited', {
+        'Team name': wallet.teamName,
+        'Amount added': `৳${Number(walletCreditAmount).toLocaleString()}`,
+        'New balance': `৳${wallet.balance.toLocaleString()}`,
+      });
       recordAdminActivity('wallet_credited', `Added ৳${Number(walletCreditAmount).toLocaleString()} to ${wallet.teamName}'s wallet.`, wallet.teamName);
       setWalletCreditMessage(`৳${Number(walletCreditAmount).toLocaleString()} added. ${wallet.teamName}'s balance is now ৳${wallet.balance.toLocaleString()}.`);
       setWalletCreditAmount('');
