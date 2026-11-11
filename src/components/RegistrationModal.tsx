@@ -17,11 +17,18 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo));
   const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
   const [players, setPlayers] = useState<Player[]>([
-    { name: savedProfile?.leaderName || '', role: 'main', slotIndex: 1 },
-    { name: '', role: 'main', slotIndex: 2 },
-    { name: '', role: 'main', slotIndex: 3 },
-    { name: '', role: 'main', slotIndex: 4 },
-    { name: '', role: 'backup', slotIndex: 5 },
+    ...[1, 2, 3, 4].map((slotIndex) => ({
+      name: savedProfile?.players?.find((player) => player.role === 'main' && player.slotIndex === slotIndex)?.name
+        || (slotIndex === 1 ? savedProfile?.leaderName : '')
+        || '',
+      role: 'main' as const,
+      slotIndex,
+    })),
+    {
+      name: savedProfile?.players?.find((player) => player.role === 'backup' || player.slotIndex === 5)?.name || '',
+      role: 'backup',
+      slotIndex: 5,
+    },
   ]);
   const [showBackup, setShowBackup] = useState(Boolean(savedProfile?.players?.some((player) => player.role === 'backup' && player.name.trim())));
   const [loading, setLoading] = useState(false);
@@ -149,6 +156,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               <label className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Player IGNs</label>
               <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-300"><ShieldCheck size={13} /> 4 required</span>
             </div>
+            {savedProfile?.players?.some((player) => player.name.trim()) && <p className="text-[10px] text-slate-500">Saved squad IGNs are filled in. Edit any field if a player has changed.</p>}
             <div className="grid gap-2.5">
               {players.slice(0, 4).map((player, index) => (
                 <label key={player.slotIndex} className="registration-player-row block rounded-2xl border border-white/[.07] bg-white/[.025] p-3 transition-colors focus-within:border-indigo-300/35 focus-within:bg-indigo-300/[.035]" style={{ animationDelay: `${index * 55}ms` }}>
