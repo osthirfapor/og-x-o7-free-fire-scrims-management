@@ -23,7 +23,9 @@ service cloud.firestore {
 
     match /team_accounts/{accountId} {
       allow read: if true;
-      allow create: if request.auth == null
+      // Public squad signup is anonymous; an authenticated organizer may also
+      // create a squad account from the admin session.
+      allow create: if (request.auth == null || isAdmin())
         && request.resource.data.status == 'approved'
         && request.resource.data.teamName is string
         && request.resource.data.teamName.size() > 0
