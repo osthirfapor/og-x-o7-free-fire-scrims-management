@@ -73,6 +73,31 @@ const cleanMapSelection = (value?: string) => {
   return valid.length ? valid.join(', ') : DEFAULT_MAP;
 };
 
+async function processTournamentImage(file: File): Promise<string> {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPG, or WebP image.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Image must be 8 MB or smaller.');
+  const source = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, 800 / Math.max(source.width, source.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(source.width * scale));
+    canvas.height = Math.max(1, Math.round(source.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Image could not be processed.');
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    let quality = 0.86;
+    let imageData = canvas.toDataURL('image/webp', quality);
+    while (imageData.length > 300_000 && quality > 0.4) {
+      quality -= 0.1;
+      imageData = canvas.toDataURL('image/webp', quality);
+    }
+    if (imageData.length > 300_000) throw new Error('Image is too detailed. Choose a smaller image.');
+    return imageData;
+  } finally {
+    source.close();
+  }
+}
+
 export const AdminPanelModal: React.FC<Props> = ({
   tournaments,
   teams,
@@ -104,6 +129,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourStatus, setTourStatus] = useState(currentTour.status);
   const [tourMap, setTourMap] = useState(cleanMapSelection(currentTour.map));
   const [tourCardImage, setTourCardImage] = useState(currentTour.cardImageUrl || '');
+  const [tourCardImageName, setTourCardImageName] = useState('');
+  const [tourImageUploading, setTourImageUploading] = useState(false);
   const [saveTourSuccess, setSaveTourSuccess] = useState(false);
 
   // Redirect Link State
@@ -128,6 +155,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourEntryFee, setNewTourEntryFee] = useState('');
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
   const [newTourCardImage, setNewTourCardImage] = useState('');
+  const [newTourCardImageName, setNewTourCardImageName] = useState('');
+  const [newTourImageUploading, setNewTourImageUploading] = useState(false);
 
   const [squadSearch, setSquadSearch] = useState('');
   const [squadTournamentFilter, setSquadTournamentFilter] = useState<string | null>(null);
@@ -156,6 +185,26 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Search Filter in Teams tab
   const [teamSearch, setTeamSearch] = useState('');
+
+  const handleTournamentImageUpload = async (file: File | undefined, mode: 'edit' | 'create') => {
+    if (!file) return;
+    const setUploading = mode === 'edit' ? setTourImageUploading : setNewTourImageUploading;
+    setUploading(true);
+    try {
+      const imageData = await processTournamentImage(file);
+      if (mode === 'edit') {
+        setTourCardImage(imageData);
+        setTourCardImageName(file.name);
+      } else {
+        setNewTourCardImage(imageData);
+        setNewTourCardImageName(file.name);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not upload this image.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Match Results & Ranking State
   const [results, setResults] = useState<MatchResult[]>([]);
@@ -377,6 +426,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       setNewTourEntryFee('');
       setNewTourGroupLink('');
       setNewTourCardImage('');
+      setNewTourCardImageName('');
       setNewTourMap([DEFAULT_MAP]);
       alert('New tournament scrim successfully created!');
     } catch (err: any) {
@@ -1302,15 +1352,22 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <input
                       type="url"
                       value={tourCardImage}
-                      onChange={(e) => setTourCardImage(e.target.value)}
+                      onChange={(e) => { setTourCardImage(e.target.value); setTourCardImageName(''); }}
                       placeholder="https://example.com/tournament-art.jpg"
                       className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                     />
-                    <p className="text-[11px] text-gray-500 mt-1">Leave blank to use the built-in category artwork.</p>
+                    <label className="mt-2 flex cursor-pointer flex-wrap items-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[.025] px-3 py-2.5 text-[11px] text-slate-300 hover:border-indigo-300/30 hover:bg-indigo-300/[.04]">
+                      <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={tourImageUploading} onChange={(event) => { void handleTournamentImageUpload(event.target.files?.[0], 'edit'); event.currentTarget.value = ''; }} />
+                      <span className="rounded-lg bg-indigo-500/15 px-2.5 py-1.5 font-bold text-indigo-200">{tourImageUploading ? 'Preparing image…' : 'Upload image'}</span>
+                      <span className="min-w-0 flex-1 truncate">{tourCardImageName || 'PNG, JPG, or WebP · up to 8 MB'}</span>
+                    </label>
+                    {tourCardImage && <img src={tourCardImage} alt="Tournament card preview" className="mt-2 h-24 w-24 rounded-xl border border-white/10 object-cover" />}
+                    <p className="text-[11px] text-gray-500 mt-1">Uploaded images are optimized and saved with this tournament. Leave blank to use the built-in artwork.</p>
                   </div>
 
                   <button
                     type="submit"
+                    disabled={tourImageUploading}
                     className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-colors"
                   >
                     Save Tournament Changes
@@ -1602,10 +1659,16 @@ export const AdminPanelModal: React.FC<Props> = ({
                     type="url"
                     placeholder="https://example.com/tournament-art.jpg"
                     value={newTourCardImage}
-                    onChange={(e) => setNewTourCardImage(e.target.value)}
+                    onChange={(e) => { setNewTourCardImage(e.target.value); setNewTourCardImageName(''); }}
                     className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
                   />
-                  <p className="text-[10px] text-gray-500 mt-1">Optional. Leave blank to use the default tournament artwork.</p>
+                  <label className="mt-2 flex cursor-pointer flex-wrap items-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[.025] px-3 py-2.5 text-[11px] text-slate-300 hover:border-indigo-300/30 hover:bg-indigo-300/[.04]">
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={newTourImageUploading} onChange={(event) => { void handleTournamentImageUpload(event.target.files?.[0], 'create'); event.currentTarget.value = ''; }} />
+                    <span className="rounded-lg bg-indigo-500/15 px-2.5 py-1.5 font-bold text-indigo-200">{newTourImageUploading ? 'Preparing image…' : 'Upload image'}</span>
+                    <span className="min-w-0 flex-1 truncate">{newTourCardImageName || 'PNG, JPG, or WebP · up to 8 MB'}</span>
+                  </label>
+                  {newTourCardImage && <img src={newTourCardImage} alt="Tournament card preview" className="mt-2 h-24 w-24 rounded-xl border border-white/10 object-cover" />}
+                  <p className="text-[10px] text-gray-500 mt-1">Optional. Uploaded images are optimized and saved with the tournament. Leave blank for default artwork.</p>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-3">
@@ -1618,6 +1681,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </button>
                   <button
                     type="submit"
+                    disabled={newTourImageUploading}
                     className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs"
                   >
                     Create Scrim
