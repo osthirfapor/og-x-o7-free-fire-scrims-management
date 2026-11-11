@@ -40,6 +40,7 @@ import {
   deleteTournament,
   updateTeam,
   deleteTeam,
+  deleteRegisteredTeamEverywhere,
   subscribeRegistrationLogs,
   subscribeAdminActivityLogs,
   writeAdminActivityLog,
@@ -89,7 +90,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'wallets' | 'teams' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'wallets' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -129,6 +130,9 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourCardImage, setNewTourCardImage] = useState('');
 
   const [squadSearch, setSquadSearch] = useState('');
+  const [squadTournamentFilter, setSquadTournamentFilter] = useState<string | null>(null);
+  const [squadDeleteMessage, setSquadDeleteMessage] = useState<string | null>(null);
+  const [deletingSquadName, setDeletingSquadName] = useState<string | null>(null);
 
   // Team Edit Modal State
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
@@ -551,9 +555,38 @@ export const AdminPanelModal: React.FC<Props> = ({
     ...allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()),
   ].filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
-  const visibleSquadAccounts = teamAccounts
-    .filter((account) => `${account.teamName} ${account.leaderName} ${(account.players || []).map((player) => player.name).join(' ')}`.toLocaleLowerCase().includes(squadSearch.toLocaleLowerCase().trim()))
-    .sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
+  const registeredSquadMap = new Map<string, { teamName: string; teamLogo?: string; leaderName: string; players: Player[]; status: string; createdAt: string; registrations: { id: string; name: string }[] }>();
+  const squadKey = (name: string) => name.trim().toLocaleLowerCase();
+  teamAccounts.forEach((account) => registeredSquadMap.set(squadKey(account.teamName), { teamName: account.teamName, teamLogo: account.teamLogo, leaderName: account.leaderName || '', players: account.players || [], status: account.status, createdAt: account.createdAt, registrations: [] }));
+  allRegisteredTeams.forEach((team) => {
+    const key = squadKey(team.teamName);
+    const existing = registeredSquadMap.get(key);
+    const tournament = tournaments.find((item) => item.id === team.tournamentId);
+    if (existing) existing.registrations.push({ id: team.tournamentId, name: tournament?.name || team.tournamentId });
+    else registeredSquadMap.set(key, { teamName: team.teamName, leaderName: team.leaderName || '', players: team.players || [], status: team.status, createdAt: team.createdAt, registrations: [{ id: team.tournamentId, name: tournament?.name || team.tournamentId }] });
+  });
+  const registeredSquads = Array.from(registeredSquadMap.values()).sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
+  const visibleRegisteredSquads = registeredSquads.filter((squad) => {
+    const matchesTournament = !squadTournamentFilter || squad.registrations.some((registration) => registration.id === squadTournamentFilter);
+    const query = squadSearch.toLocaleLowerCase().trim();
+    const matchesQuery = !query || `${squad.teamName} ${squad.leaderName} ${squad.players.map((player) => player.name).join(' ')} ${squad.registrations.map((registration) => registration.name).join(' ')}`.toLocaleLowerCase().includes(query);
+    return matchesTournament && matchesQuery;
+  });
+  const handleDeleteSquadEverywhere = async (squad: (typeof registeredSquads)[number]) => {
+    if (!confirm(`Permanently delete ${squad.teamName} and its team account, all scrim registrations, match results, registration logs, and wallet balance?`)) return;
+    setDeletingSquadName(squad.teamName);
+    setSquadDeleteMessage(null);
+    try {
+      await deleteRegisteredTeamEverywhere(squad.teamName);
+      recordAdminActivity('team_deleted_globally', 'Deleted a team and all associated registrations, results, logs, and wallet data.');
+      if (walletTeamName.trim().toLocaleLowerCase() === squad.teamName.trim().toLocaleLowerCase()) setWalletTeamName('');
+      setSquadDeleteMessage(`${squad.teamName} was deleted from all website records.`);
+    } catch (error) {
+      setSquadDeleteMessage(error instanceof Error ? `Delete failed: ${error.message}` : 'Delete failed. Please retry.');
+    } finally {
+      setDeletingSquadName(null);
+    }
+  };
   const searchedTeams = currentTourTeams.filter((t) => {
     const q = teamSearch.toLowerCase().trim();
     if (!q) return true;
@@ -667,8 +700,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                   { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
-                  { id: 'squads', label: `Registered Teams (${teamAccounts.length})`, icon: Users },
-                  { id: 'teams', label: `Scrim Entries (${currentTourTeams.length})`, icon: CalendarDays },
+                  { id: 'squads', label: `Registered Teams (${registeredSquads.length})`, icon: Users },
                   { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
                   { id: 'history', label: `Match History (${publishedTourResults.length + completedScrims.length})`, icon: HistoryIcon },
@@ -676,7 +708,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
-                    <button key={item.id} type="button" title={item.label} onClick={() => setTab(item.id as typeof tab)} className={`admin-side-link flex items-center gap-2.5 rounded-xl px-3 py-3 text-left text-xs font-bold transition-all ${tab === item.id ? 'is-active' : 'text-slate-400 hover:bg-white/[.04] hover:text-white'}`}>
+                    <button key={item.id} type="button" title={item.label} onClick={() => { if (item.id === 'squads') setSquadTournamentFilter(null); setTab(item.id as typeof tab); }} className={`admin-side-link flex items-center gap-2.5 rounded-xl px-3 py-3 text-left text-xs font-bold transition-all ${tab === item.id ? 'is-active' : 'text-slate-400 hover:bg-white/[.04] hover:text-white'}`}>
                       <Icon size={15} className="shrink-0" />
                       <span className="truncate">{item.label}</span>
                     </button>
@@ -708,7 +740,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); }} className="truncate text-left text-sm font-bold text-white transition hover:text-orange-100">{tour.name}</button>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); }} className="truncate text-left text-sm font-bold text-white transition hover:text-orange-100">{tour.name}</button>
                                   {selected && <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-orange-200">Selected</span>}
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
@@ -718,11 +750,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                                 </div>
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
-                                <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); }} className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] px-3 py-2.5 text-[10px] font-bold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-300/[.1]">Teams · {tour.registeredCount}</button>
+                                <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); }} className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] px-3 py-2.5 text-[10px] font-bold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-300/[.1]">Teams · {tour.registeredCount}</button>
                                 <div className="relative">
                                 <button type="button" aria-label={`Actions for ${tour.name}`} aria-expanded={openScrimMenu === tour.id} onClick={() => setOpenScrimMenu((open) => open === tour.id ? null : tour.id)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:bg-orange-300/[.07] hover:text-white"><MoreVertical size={17} /></button>
                                 {openScrimMenu === tour.id && <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl">
-                                  <button type="button" onClick={() => { handleSelectTournament(tour); setTab('teams'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Manage teams</button>
+                                  <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button>
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setTab('tournament'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button>
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setTab('redirect'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button>
                                   <button type="button" disabled={full && tour.status !== 'open'} onClick={() => { void handleToggleRegistration(tour); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06] disabled:opacity-40">{tour.status === 'open' ? 'Close registration' : 'Open registration'}</button>
@@ -745,10 +777,12 @@ export const AdminPanelModal: React.FC<Props> = ({
               {tab === 'squads' && (
                 <section className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad accounts</div><h3 className="mt-1 text-lg font-extrabold text-white">Registered Teams</h3><p className="mt-1 text-xs text-slate-400">All squads that created an account, whether or not they joined a scrim.</p></div>
-                    <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={squadSearch} onChange={(event) => setSquadSearch(event.target.value)} placeholder="Search team or IGN" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
+                    <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad directory</div><h3 className="mt-1 text-lg font-extrabold text-white">Registered Teams</h3><p className="mt-1 text-xs text-slate-400">Every registered squad, its players, and scrims joined.</p></div>
+                    <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={squadSearch} onChange={(event) => setSquadSearch(event.target.value)} placeholder="Search team, IGN, or scrim" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
                   </div>
-                  {visibleSquadAccounts.length ? <div className="grid gap-3 lg:grid-cols-2">{visibleSquadAccounts.map((account, index) => <article key={account.id} className="wallet-card rounded-2xl border border-white/[.08] bg-[#151720] p-4" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}><div className="flex items-start gap-3"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{account.teamLogo ? <img src={account.teamLogo} alt={`${account.teamName} logo`} className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-200">{account.teamName.slice(0, 2).toUpperCase()}</span>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h4 className="truncate text-sm font-extrabold text-white">{account.teamName}</h4><span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${account.status === 'banned' || account.status === 'rejected' ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200'}`}>{account.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{account.leaderName}</strong></div><div className="mt-3 flex flex-wrap gap-1.5">{(account.players || []).map((player) => <span key={`${account.id}-${player.slotIndex}`} className="rounded-lg border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div><div className="mt-2 text-[9px] text-slate-600">Created {new Date(account.createdAt).toLocaleDateString()}</div></div></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{teamAccounts.length ? 'No squad matches that search.' : 'Squads will appear here as soon as they create an account.'}</div>}
+                  {squadTournamentFilter && <div className="flex items-center justify-between rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-2 text-[11px] text-cyan-100"><span>Scrim filter: {tournaments.find((item) => item.id === squadTournamentFilter)?.name || 'Selected scrim'}</span><button type="button" onClick={() => setSquadTournamentFilter(null)} className="font-bold hover:text-white">Show all teams</button></div>}
+                  {squadDeleteMessage && <div role="status" className="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-[11px] text-slate-200">{squadDeleteMessage}</div>}
+                  {visibleRegisteredSquads.length ? <div className="space-y-3">{visibleRegisteredSquads.map((squad, index) => <article key={squadKey(squad.teamName)} className="wallet-card rounded-2xl border border-white/[.08] bg-[#151720] p-4" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}><div className="flex items-start gap-3"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{squad.teamLogo ? <img src={squad.teamLogo} alt={`${squad.teamName} logo`} className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-200">{squad.teamName.slice(0, 2).toUpperCase()}</span>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] font-bold tabular-nums text-cyan-200">{String(index + 1).padStart(2, '0')}.</span><h4 className="truncate text-sm font-extrabold text-white">{squad.teamName}</h4><span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-200">{squad.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{squad.leaderName || '—'}</strong></div><div className="mt-3 flex flex-wrap gap-1.5">{squad.players.map((player) => <span key={`${squadKey(squad.teamName)}-${player.slotIndex}-${player.name}`} className="rounded-lg border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div><div className="mt-3 flex flex-wrap gap-1.5">{squad.registrations.map((registration) => <span key={`${registration.id}-${squadKey(squad.teamName)}`} className="rounded-full border border-indigo-300/15 bg-indigo-300/[.06] px-2 py-1 text-[9px] text-indigo-100">{registration.name}</span>)}{!squad.registrations.length && <span className="text-[10px] text-slate-500">No scrim registration yet</span>}</div></div><button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => void handleDeleteSquadEverywhere(squad)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-300/15 bg-rose-300/[.06] px-2.5 py-2 text-[10px] font-bold text-rose-200 transition hover:bg-rose-300/[.12] disabled:opacity-50"><Trash2 size={13}/>{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete everywhere'}</button></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this filter.' : 'Registered teams will appear here as soon as a squad account or scrim entry exists.'}</div>}
                 </section>
               )}
 
@@ -827,7 +861,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <span className="font-bold text-white">
                               {t.registeredCount} / {t.maxTeams} Teams
                             </span>
-                            <div className="relative"><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { handleSelectTournament(t); setTab('teams'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">Manage teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
+                            <div className="relative"><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { handleSelectTournament(t); setSquadTournamentFilter(t.id); setTab('squads'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
                           </div>
                         </div>
                       ))}
@@ -842,7 +876,7 @@ export const AdminPanelModal: React.FC<Props> = ({
               )}
 
               {/* TAB 2: TEAMS MANAGEMENT */}
-              {tab === 'teams' && (
+              {false && (
                 <div className="space-y-4">
                   <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Scrim entries</div><h3 className="mt-1 text-lg font-extrabold text-white">{currentTour.name}</h3><p className="mt-1 text-xs text-slate-400">Teams registered for this scrim: {currentTourTeams.length}.</p></div>
                   <div className="flex flex-wrap items-center justify-between gap-3">

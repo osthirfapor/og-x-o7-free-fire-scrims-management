@@ -84,6 +84,7 @@ function MainApp() {
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [teamAccounts, setTeamAccounts] = useState<TeamAccount[]>([]);
+  const [teamAccountsLoaded, setTeamAccountsLoaded] = useState(false);
   const currentTeams = useMemo(
     () => allTeams.filter((team) => team.tournamentId === activeTournament?.id),
     [allTeams, activeTournament?.id]
@@ -235,7 +236,16 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  useEffect(() => subscribeTeamAccounts((accounts) => setTeamAccounts(accounts)), []);
+  useEffect(() => subscribeTeamAccounts((accounts) => {
+    setTeamAccounts(accounts);
+    setTeamAccountsLoaded(true);
+  }, () => setTeamAccountsLoaded(true)), []);
+
+  useEffect(() => {
+    if (!teamAccountsLoaded || !teamProfile || !teamProfile.userId.startsWith('account_')) return;
+    const accountStillExists = teamAccounts.some((account) => account.id === teamProfile.userId);
+    if (!accountStillExists) handleLogoutTeam();
+  }, [teamAccounts, teamAccountsLoaded, teamProfile?.userId]);
 
   useEffect(() => {
     if (!teamProfile) {

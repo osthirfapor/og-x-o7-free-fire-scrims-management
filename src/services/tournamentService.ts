@@ -528,6 +528,77 @@ export async function deleteTeam(tournamentId: string, teamId: string) {
   }
 }
 
+export async function deleteRegisteredTeamEverywhere(teamNameInput: string): Promise<{ registrations: number; results: number; accounts: number }> {
+  const teamName = teamNameInput.trim();
+  const teamKey = teamName.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ');
+  if (!teamKey) throw new Error('Team name is required.');
+  const banRef = doc(db, 'banned_teams', teamBanDocId(teamName));
+  const now = new Date().toISOString();
+
+  try {
+    // Temporarily block new account and tournament registrations while related records are removed.
+    await setDoc(banRef, { id: banRef.id, teamName, enabled: true, updatedAt: now });
+    const tournamentsSnapshot = await getDocs(collection(db, 'tournaments'));
+    const tournamentIds = tournamentsSnapshot.docs.map((item) => item.id);
+    const [accountSnapshot, resultSnapshot, logSnapshot, activitySnapshot, ...teamSnapshots] = await Promise.all([
+      getDocs(collection(db, 'team_accounts')),
+      getDocs(collection(db, 'match_results')),
+      getDocs(collection(db, 'registration_logs')),
+      getDocs(collection(db, 'admin_activity_logs')),
+      ...tournamentIds.map((id) => getDocs(collection(db, 'tournaments', id, 'teams'))),
+    ]);
+
+    const registrationsByTournament = tournamentIds.map((id, index) => ({
+      id,
+      docs: teamSnapshots[index].docs.filter((item) => String(item.data().teamName || '').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ') === teamKey),
+    })).filter((entry) => entry.docs.length > 0);
+
+    for (const registration of registrationsByTournament) {
+      const tournamentRef = doc(db, 'tournaments', registration.id);
+      await runTransaction(db, async (transaction) => {
+        const teamRefs = registration.docs.map((item) => item.ref);
+        const [tournament, ...teamDocs] = await Promise.all([
+          transaction.get(tournamentRef),
+          ...teamRefs.map((ref) => transaction.get(ref)),
+        ]);
+        const existingRefs = teamRefs.filter((_, index) => teamDocs[index].exists());
+        if (tournament.exists() && existingRefs.length) {
+          const data = tournament.data() as Tournament;
+          const registeredCount = Math.max(0, (data.registeredCount || 0) - existingRefs.length);
+          transaction.update(tournamentRef, {
+            registeredCount,
+            status: data.status === 'closed' && registeredCount < data.maxTeams ? 'open' : data.status,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        existingRefs.forEach((ref) => transaction.delete(ref));
+      });
+    }
+
+    const sameTeam = (data: Record<string, unknown>) => String(data.teamName || '').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ') === teamKey;
+    const accounts = accountSnapshot.docs.filter((item) => sameTeam(item.data()));
+    const results = resultSnapshot.docs.filter((item) => sameTeam(item.data()));
+    const logs = logSnapshot.docs.filter((item) => sameTeam(item.data()));
+    const activity = activitySnapshot.docs.filter((item) => sameTeam(item.data()));
+    const refs = [
+      ...accounts.map((item) => item.ref),
+      ...results.map((item) => item.ref),
+      ...logs.map((item) => item.ref),
+      ...activity.map((item) => item.ref),
+      doc(db, 'team_wallets', teamWalletDocId(teamName)),
+      banRef,
+    ];
+    for (let offset = 0; offset < refs.length; offset += 450) {
+      const batch = writeBatch(db);
+      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+    return { registrations: registrationsByTournament.reduce((count, entry) => count + entry.docs.length, 0), results: results.length, accounts: accounts.length };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `team/${teamName}`);
+  }
+}
+
 // 9. Subscribe to Registration Logs
 export function subscribeRegistrationLogs(
   onData: (logs: RegistrationLog[]) => void,
