@@ -31,8 +31,8 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
-  const officialWhatsAppMessage = `Official tournament registration\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTournament: ${tournament.name}`;
-  const officialWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(officialWhatsAppMessage)}`;
+  const supportWhatsAppMessage = `Hi, I need support with my tournament registration.\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTeam leader: ${team.leaderName}\nTournament: ${tournament.name}`;
+  const supportWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(supportWhatsAppMessage)}`;
   const tournamentUpdatesGroupUrl = 'https://chat.whatsapp.com/JxesDN4y8fB6QT68aygFWr';
 
   return (
@@ -138,11 +138,11 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         {/* Footer Actions */}
         <div className="flex flex-col-reverse gap-2 pt-3 border-t border-[#23242e] sm:flex-row sm:justify-between">
           <a
-            href={officialWhatsAppUrl}
-            onClick={(event) => { event.preventDefault(); openWhatsAppTab(officialWhatsAppUrl); }}
+            href={supportWhatsAppUrl}
+            onClick={(event) => { event.preventDefault(); openWhatsAppTab(supportWhatsAppUrl); }}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/20"
           >
-            <MessageCircle size={15} /> Submit Official Registration ID
+            <MessageCircle size={15} /> WhatsApp Support
           </a>
           <button
             onClick={onClose}
