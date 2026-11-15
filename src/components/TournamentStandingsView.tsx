@@ -6,6 +6,7 @@ interface Props {
   tournament: Tournament;
   teams: Team[];
   results: MatchResult[];
+  myGroupName?: string;
 }
 
 const GROUP_SIZE = 12;
@@ -27,22 +28,21 @@ function groupLabel(index: number) {
   return `GROUP-${label}`;
 }
 
-export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, results }) => {
+export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, results, myGroupName }) => {
   const publishedResults = results.filter((result) => result.tournamentId === tournament.id && result.published !== false);
   const tournamentTeams = useMemo(() => teams
     .filter((team) => team.tournamentId === tournament.id && team.status === 'approved')
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id)), [teams, tournament.id]);
   const groupingEnabled = tournament.groupsEnabled === true || tournament.unlimitedGroups === true || tournament.unlimitedTeams === true;
   const teamsPerGroup = tournament.teamsPerGroup || GROUP_SIZE;
-  const groupCount = groupingEnabled ? Math.max(1, Number(tournament.groupCount) || Math.ceil(tournamentTeams.length / teamsPerGroup) || 1) : 0;
+  const groupCount = groupingEnabled ? Math.max(1, Math.ceil(tournamentTeams.length / teamsPerGroup), tournament.unlimitedGroups || tournament.unlimitedTeams ? 0 : Number(tournament.groupCount) || 0) : 0;
   const teamGroups = useMemo(() => new Map(tournamentTeams.map((team, index) => [team.teamName.trim().toLowerCase(), groupLabel(Math.floor(index / teamsPerGroup))])), [tournamentTeams, teamsPerGroup]);
   const groups = useMemo(() => Array.from({ length: groupCount }, (_, index) => groupLabel(index)), [groupCount]);
-  const matches = useMemo(() => Array.from(new Set(publishedResults.map((result) => result.mapNumber || 1))).sort((a, b) => a - b), [publishedResults]);
-  const [selectedGroup, setSelectedGroup] = useState('all');
+  const [selectedGroup, setSelectedGroup] = useState(myGroupName || 'all');
 
   useEffect(() => {
-    setSelectedGroup('all');
-  }, [tournament.id]);
+    setSelectedGroup(myGroupName || 'all');
+  }, [tournament.id, myGroupName]);
 
   const themeKey = tournament.standingsTheme && tournament.standingsTheme in GROUP_THEMES
     ? tournament.standingsTheme as keyof typeof GROUP_THEMES
@@ -69,6 +69,9 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
       if (b.result) return 1;
       return a.team.teamName.localeCompare(b.team.teamName);
     });
+  const displayedMatchCount = new Set(publishedResults
+    .filter((result) => selectedGroup === 'all' || teamGroups.get(result.teamName.trim().toLowerCase()) === selectedGroup)
+    .map((result) => result.mapNumber || 1)).size;
 
   return (
     <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-300/15 bg-[#071b13] shadow-xl shadow-black/20 sm:mb-6 sm:rounded-3xl">
@@ -77,10 +80,11 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-emerald-200 sm:text-[10px]"><Trophy size={13} /> Published standings</div>
             <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{tournament.name}</h2>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · Overall · {matches.length} matches</p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · Overall · {displayedMatchCount} matches</p>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:max-w-md sm:flex-1 lg:max-w-lg">
-            {groupingEnabled && <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Group
+            {groupingEnabled && myGroupName && <div className="flex items-center justify-between rounded-xl border border-violet-200/15 bg-violet-200/[.06] px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-violet-100"><span>Your group</span><span className="text-xs font-black">{myGroupName}</span></div>}
+            {groupingEnabled && !myGroupName && <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Group
               <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="mt-1 w-full rounded-xl border border-emerald-100/10 bg-black/25 px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-emerald-200/40">
                 <option value="all">All groups</option>
                 {groups.map((group) => <option key={group} value={group}>{group}</option>)}

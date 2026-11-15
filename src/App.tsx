@@ -365,7 +365,7 @@ function MainApp() {
     if (!teamProfile) return [];
     const registrations = allTeams
       .filter((team) => team.teamName.trim().toLocaleLowerCase() === teamProfile.teamName.trim().toLocaleLowerCase()
-        && team.leaderName.trim().toLocaleLowerCase() === teamProfile.leaderName.trim().toLocaleLowerCase())
+        && (teamProfile.userId.startsWith('account_') || team.leaderName.trim().toLocaleLowerCase() === teamProfile.leaderName.trim().toLocaleLowerCase()))
       .map((team) => ({ team, tournament: tournaments.find((tournament) => tournament.id === team.tournamentId) }))
       .filter((item): item is { team: Team; tournament: Tournament } => Boolean(item.tournament))
       .sort((a, b) => new Date(b.team.createdAt).getTime() - new Date(a.team.createdAt).getTime());
@@ -909,6 +909,7 @@ function MainApp() {
               tournament={tournaments.find((tournament) => tournament.id === activeTournament.id) || activeTournament}
               teams={allTeams}
               results={publishedResults}
+              myGroupName={myRegistrations.find((registration) => registration.tournament.id === activeTournament.id)?.groupName}
             />
             <RegisteredTeamsView
               teams={currentTeams}
