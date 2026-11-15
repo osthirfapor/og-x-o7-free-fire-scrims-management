@@ -39,16 +39,10 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
   const groups = useMemo(() => Array.from({ length: groupCount }, (_, index) => groupLabel(index)), [groupCount]);
   const matches = useMemo(() => Array.from(new Set(publishedResults.map((result) => result.mapNumber || 1))).sort((a, b) => a - b), [publishedResults]);
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [selectedMatch, setSelectedMatch] = useState<number | 'all'>('all');
 
   useEffect(() => {
     setSelectedGroup('all');
-    setSelectedMatch('all');
   }, [tournament.id]);
-
-  useEffect(() => {
-    if (selectedMatch !== 'all' && !matches.includes(selectedMatch)) setSelectedMatch('all');
-  }, [matches, selectedMatch]);
 
   const themeKey = tournament.standingsTheme && tournament.standingsTheme in GROUP_THEMES
     ? tournament.standingsTheme as keyof typeof GROUP_THEMES
@@ -56,7 +50,6 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
   const theme = GROUP_THEMES[themeKey];
   const resultsByTeam = new Map<string, { booyah: number; kills: number; positionPoints: number; total: number; matches: number }>();
   publishedResults
-    .filter((result) => selectedMatch === 'all' || (result.mapNumber || 1) === selectedMatch)
     .forEach((result) => {
       const key = result.teamName.trim().toLowerCase();
       const totals = resultsByTeam.get(key) || { booyah: 0, kills: 0, positionPoints: 0, total: 0, matches: 0 };
@@ -84,30 +77,24 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-emerald-200 sm:text-[10px]"><Trophy size={13} /> Published standings</div>
             <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{tournament.name}</h2>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · {selectedMatch === 'all' ? `Overall · ${matches.length} matches` : `Match ${selectedMatch}`}</p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · Overall · {matches.length} matches</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:max-w-md sm:flex-1 lg:max-w-lg">
+          <div className="grid grid-cols-1 gap-2 sm:max-w-md sm:flex-1 lg:max-w-lg">
             {groupingEnabled && <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Group
               <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="mt-1 w-full rounded-xl border border-emerald-100/10 bg-black/25 px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-emerald-200/40">
                 <option value="all">All groups</option>
                 {groups.map((group) => <option key={group} value={group}>{group}</option>)}
               </select>
             </label>}
-            <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Match
-              <select value={selectedMatch === 'all' ? 'all' : String(selectedMatch)} onChange={(event) => setSelectedMatch(event.target.value === 'all' ? 'all' : Number(event.target.value))} className="mt-1 w-full rounded-xl border border-emerald-100/10 bg-black/25 px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-emerald-200/40">
-                <option value="all">Overall · All Matches</option>
-                {(matches.length ? matches : [1]).map((match) => <option key={match} value={match}>Match {match}</option>)}
-              </select>
-            </label>
           </div>
         </div>
       </header>
 
       <div className="overflow-x-auto p-2 sm:p-4">
-        <table className="w-full min-w-[660px] border-separate border-spacing-y-1.5 text-left sm:border-spacing-y-2">
+        <table className="w-full min-w-[720px] border-separate border-spacing-y-1.5 text-left sm:border-spacing-y-2">
           <thead>
             <tr className="text-[9px] font-black uppercase tracking-wider sm:text-[10px]">
-              {['#', '', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading, index) => <th key={`${heading}-${index}`} style={{ backgroundColor: theme.accent, color: theme.text }} className={`px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 ${heading === 'Team name' ? 'w-[38%] text-left' : 'text-center'}`}>{heading}</th>)}
+              {['#', '', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Matches', 'Total'].map((heading, index) => <th key={`${heading}-${index}`} style={{ backgroundColor: theme.accent, color: theme.text }} className={`px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 ${heading === 'Team name' ? 'w-[34%] text-left' : 'text-center'}`}>{heading}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -118,9 +105,10 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
               <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result ? result.booyah : '—'}</td>
               <td style={{ backgroundColor: theme.row }} className="px-3 py-2.5 text-center tabular-nums text-white">{result?.kills ?? '—'}</td>
               <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result ? result.positionPoints : '—'}</td>
+              <td style={{ backgroundColor: theme.row, color: theme.soft }} className="px-3 py-2.5 text-center tabular-nums">{result?.matches ?? '—'}</td>
               <td style={{ backgroundColor: theme.row, color: theme.soft }} className="rounded-r-full px-3 py-2.5 text-center tabular-nums sm:px-4">{result?.total ?? '—'}</td>
             </tr>)}
-            {!rows.length && <tr><td colSpan={7} className="rounded-xl border border-white/[.06] bg-black/20 px-4 py-10 text-center text-xs text-slate-400">No registered teams in this group.</td></tr>}
+            {!rows.length && <tr><td colSpan={8} className="rounded-xl border border-white/[.06] bg-black/20 px-4 py-10 text-center text-xs text-slate-400">No registered teams in this group.</td></tr>}
           </tbody>
         </table>
         {!publishedResults.length && <p className="px-2 pb-2 pt-3 text-center text-[10px] text-slate-500">Organizer has not published results for this tournament yet.</p>}
