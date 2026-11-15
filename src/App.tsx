@@ -55,6 +55,7 @@ import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { TournamentStandingsView } from './components/TournamentStandingsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { normalizeWhatsAppNumber } from './utils/phone';
+import { openWhatsAppTab } from './utils/openWhatsAppTab';
 import type { WhatsAppCountry } from './utils/phone';
 
 function FirstLoginWhatsAppModal({ onSave }: { onSave: (number: string) => void }) {
@@ -355,7 +356,7 @@ function MainApp() {
       `Amount: BDT ${requestedTopUpAmount.toLocaleString()}`,
       `Current wallet balance: BDT ${walletBalance.toLocaleString()}`,
     ].join('\n');
-    window.open(`https://wa.me/8801937679130?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    openWhatsAppTab(`https://wa.me/8801937679130?text=${encodeURIComponent(message)}`);
   };
   const myRegistrations = useMemo(() => {
     if (!teamProfile) return [];

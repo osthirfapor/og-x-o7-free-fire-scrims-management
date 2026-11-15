@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Copy, MessageCircle, Users, X } from 'lucide-react';
 import { Team, Tournament } from '../types/tournament';
+import { openWhatsAppTab } from '../utils/openWhatsAppTab';
 
 interface Props {
   team: Team;
@@ -132,8 +133,7 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         <div className="flex flex-col-reverse gap-2 pt-3 border-t border-[#23242e] sm:flex-row sm:justify-between">
           <a
             href={officialWhatsAppUrl}
-            target="_blank"
-            rel="noreferrer"
+            onClick={(event) => { event.preventDefault(); openWhatsAppTab(officialWhatsAppUrl); }}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/20"
           >
             <MessageCircle size={15} /> Submit Official Registration ID
