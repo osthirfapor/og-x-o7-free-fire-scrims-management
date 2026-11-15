@@ -1150,7 +1150,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   <div className="bg-[#15161d] border border-[#272833] rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                        All Tournaments & Scrims
+                        Active Tournaments & Scrims
                       </h4>
                       <button
                         onClick={() => setShowCreateTour(true)}
@@ -1164,7 +1164,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       {tournamentsWithSlots.map((t) => (
                           <div key={t.id} onDoubleClick={() => openTournamentTeams(t)} title="Double-click to view registered teams" className="cursor-pointer py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
-                            <div className="font-bold text-white text-sm">{t.name}</div>
+                            <div className="flex flex-wrap items-center gap-2"><div className="font-bold text-white text-sm">{t.name}</div><span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-extrabold uppercase text-emerald-200">Active</span></div>
                             <div className="text-gray-400 mt-0.5">
                               {t.date} • {t.time}
                             </div>
@@ -1187,11 +1187,19 @@ export const AdminPanelModal: React.FC<Props> = ({
                         </div>
                       ))}
                       {tournamentsWithSlots.length === 0 && (
-                        <div className="py-6 text-center text-xs text-gray-500">
-                          No tournaments with open slots. Full tournaments remain available in the Selected Scrim menu.
+                          <div className="py-6 text-center text-xs text-gray-500">
+                          No active tournaments. Completed tournaments are listed separately below.
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#272833] bg-[#15161d] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div><h4 className="text-xs font-bold uppercase tracking-wider text-gray-300">Completed Tournaments</h4><p className="mt-1 text-[10px] text-gray-500">Archived here after you mark a tournament complete.</p></div>
+                      <span className="rounded-full border border-slate-300/15 bg-slate-300/[.06] px-2.5 py-1 text-[10px] font-bold text-slate-300">{completedScrims.length} completed</span>
+                    </div>
+                    {completedScrims.length === 0 ? <div className="rounded-lg border border-dashed border-white/10 py-6 text-center text-xs text-gray-500">No completed tournaments yet.</div> : <div className="divide-y divide-[#22232c]">{completedScrims.map((t) => <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><div className="truncate font-bold text-white text-sm">{t.name}</div><span className="rounded-full border border-slate-300/15 bg-slate-300/[.06] px-2 py-0.5 text-[9px] font-extrabold uppercase text-slate-300">Completed</span></div><div className="mt-1 text-gray-400">{t.date} · {t.time} · {t.registeredCount} teams</div></div><button type="button" onClick={() => setTab('history')} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-bold text-slate-200 transition hover:border-orange-300/25 hover:text-white">View history</button></div>)}</div>}
                   </div>
                 </div>
               )}
