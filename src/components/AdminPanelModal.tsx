@@ -122,6 +122,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'database' | 'wallets' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
   const [databaseTeamSearch, setDatabaseTeamSearch] = useState('');
   const [expandedDatabaseTeam, setExpandedDatabaseTeam] = useState<string | null>(null);
+  const [openDatabaseLoginMenu, setOpenDatabaseLoginMenu] = useState<string | null>(null);
+  const [copiedDatabaseLogin, setCopiedDatabaseLogin] = useState<string | null>(null);
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -349,6 +351,22 @@ export const AdminPanelModal: React.FC<Props> = ({
     } catch {
       window.prompt('Copy registration link:', link);
     }
+  };
+
+  const copySquadLoginDetails = async (squad: { teamName: string; leaderName: string }) => {
+    const publicUrl = new URL(window.location.href);
+    publicUrl.searchParams.delete('panel');
+    publicUrl.searchParams.delete('register');
+    publicUrl.hash = '';
+    const details = `Team login details\nLogin page: ${publicUrl.origin}${publicUrl.pathname}\nTeam name: ${squad.teamName}\nCaptain IGN: ${squad.leaderName}`;
+    try {
+      await navigator.clipboard.writeText(details);
+      setCopiedDatabaseLogin(squadKey(squad.teamName));
+      window.setTimeout(() => setCopiedDatabaseLogin(null), 2200);
+    } catch {
+      window.prompt('Copy team login details:', details);
+    }
+    setOpenDatabaseLoginMenu(null);
   };
 
   // Toggle registration directly from the Scrims list.
@@ -917,6 +935,10 @@ export const AdminPanelModal: React.FC<Props> = ({
                           {expanded ? <ChevronUp size={14} className="ml-auto shrink-0 text-slate-400"/> : <ChevronDown size={14} className="ml-auto shrink-0 text-slate-400"/>}
                         </button>
                         {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Message ${squad.teamName} on WhatsApp`} title={`Send WhatsApp message${squad.whatsappNumber ? ` to ${squad.whatsappNumber}` : ''}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] text-emerald-200 hover:bg-emerald-300/15"><MessageCircle size={15}/></a> : <span title="No WhatsApp number saved" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.06] text-slate-600"><MessageCircle size={14}/></span>}
+                        <div className="relative shrink-0">
+                          <button type="button" aria-label={`More options for ${squad.teamName}`} aria-expanded={openDatabaseLoginMenu === key} onClick={() => setOpenDatabaseLoginMenu((open) => open === key ? null : key)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/[.08] bg-white/[.03] text-slate-400 hover:bg-white/[.08] hover:text-white"><MoreVertical size={15}/></button>
+                          {openDatabaseLoginMenu === key && <div className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => void copySquadLoginDetails(squad)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.07]">{copiedDatabaseLogin === key ? 'Copied login details' : 'Copy login details'}</button></div>}
+                        </div>
                       </div>
                       {expanded && <div className="flex flex-wrap gap-1.5 border-t border-white/[.07] bg-black/10 px-3 py-2.5">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.name}</span>)}</div>}
                     </article>;
