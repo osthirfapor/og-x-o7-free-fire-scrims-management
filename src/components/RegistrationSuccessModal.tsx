@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, Copy, Users, X } from 'lucide-react';
+import { CheckCircle2, Copy, MessageCircle, Users, X } from 'lucide-react';
 import { Team, Tournament } from '../types/tournament';
 
 interface Props {
@@ -30,6 +30,8 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
+  const officialWhatsAppMessage = `Official tournament registration\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTournament: ${tournament.name}`;
+  const officialWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(officialWhatsAppMessage)}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -127,7 +129,15 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end pt-3 border-t border-[#23242e]">
+        <div className="flex flex-col-reverse gap-2 pt-3 border-t border-[#23242e] sm:flex-row sm:justify-between">
+          <a
+            href={officialWhatsAppUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/20"
+          >
+            <MessageCircle size={15} /> Submit Official Registration ID
+          </a>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-[#22232c] hover:bg-[#2c2d39] text-gray-200 hover:text-white rounded-xl text-xs font-semibold transition-colors"
