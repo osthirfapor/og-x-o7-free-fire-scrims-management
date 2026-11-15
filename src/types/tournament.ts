@@ -74,6 +74,7 @@ export interface Tournament {
   teamsPerGroup?: number;
   groupCount?: number;
   unlimitedTeams?: boolean;
+  standingsTheme?: 'lime' | 'cyan' | 'orange' | 'violet';
   entryFee?: string;
   entryFeeAmount?: number;
   prizePool?: string;

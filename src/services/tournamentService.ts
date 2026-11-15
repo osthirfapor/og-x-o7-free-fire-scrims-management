@@ -784,7 +784,7 @@ export async function addMatchResult(params: {
   }
 }
 
-export async function publishTournamentResults(tournamentId: string): Promise<number> {
+export async function publishTournamentResults(tournamentId: string, standingsTheme?: Tournament['standingsTheme']): Promise<number> {
   try {
     const snapshot = await getDocs(collection(db, 'match_results'));
     const drafts = snapshot.docs.filter((item) => {
@@ -793,6 +793,7 @@ export async function publishTournamentResults(tournamentId: string): Promise<nu
     });
     const publishedAt = new Date().toISOString();
     await Promise.all(drafts.map((item) => updateDoc(item.ref, { published: true, publishedAt })));
+    if (standingsTheme) await updateDoc(doc(db, 'tournaments', tournamentId), { standingsTheme, updatedAt: publishedAt });
     return drafts.length;
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `match_results/${tournamentId}`);

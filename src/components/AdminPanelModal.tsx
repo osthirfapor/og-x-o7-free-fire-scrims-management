@@ -720,13 +720,15 @@ export const AdminPanelModal: React.FC<Props> = ({
   };
 
   const handlePublishResults = async () => {
-    if (!draftTourResults.length) return;
     const selectedResultsTournament = tournaments.find((tournament) => tournament.id === resultsTournamentId) || currentTour;
-    if (!confirm(`Publish ${draftTourResults.length} result(s) for ${selectedResultsTournament.name} to the public leaderboard and match history?`)) return;
+    const themeChanged = selectedResultsTournament.standingsTheme !== previewTableTheme;
+    if (!draftTourResults.length && !themeChanged) return;
+    const publishSummary = [draftTourResults.length ? `${draftTourResults.length} result(s)` : '', themeChanged ? 'the standings table color' : ''].filter(Boolean).join(' and ');
+    if (!confirm(`Publish ${publishSummary} for ${selectedResultsTournament.name} so teams can view them in My Tournaments?`)) return;
     try {
-      const publishedCount = await publishTournamentResults(selectedResultsTournament.id);
+      const publishedCount = await publishTournamentResults(selectedResultsTournament.id, previewTableTheme);
       void writeAdminActivityLog({ eventType: 'match_results_published', summary: `Published ${publishedCount} result(s) for ${selectedResultsTournament.name}.`, tournamentId: selectedResultsTournament.id, tournamentName: selectedResultsTournament.name }).catch((error) => console.warn('Could not save admin activity log:', error));
-      setResMsg(`✅ ${publishedCount} result(s) published to Match History.`);
+      setResMsg(`✅ Published ${publishedCount} result(s) and standings table for teams.`);
       window.setTimeout(() => setResMsg(null), 3000);
     } catch (err) {
       setResMsg(`❌ ${err instanceof Error ? err.message : 'Could not publish results.'}`);
@@ -1317,7 +1319,12 @@ export const AdminPanelModal: React.FC<Props> = ({
 
               {/* TAB: MATCH RESULTS & RANKING */}
               {tab === 'results' && (
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+                <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-300/15 bg-gradient-to-r from-emerald-500/[.08] to-cyan-500/[.04] px-4 py-3">
+                  <div><div className="text-xs font-extrabold uppercase tracking-wider text-white">Publish tournament standings</div><p className="mt-1 text-[10px] text-slate-400">Teams can view published results from My Tournaments.</p></div>
+                  <button type="button" disabled={!draftTourResults.length && selectedResultsTournament.standingsTheme === previewTableTheme} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-emerald-950/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"><CheckCircle2 size={15} /> Publish Results ({draftTourResults.length})</button>
+                </div>
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
                   <div className="xl:col-span-2 space-y-4">
                     <form onSubmit={handleAddResult} className="bg-[#15161d] border border-[#272833] rounded-xl p-4 space-y-3">
                       <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1515,6 +1522,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
+                </div>
                 </div>
               )}
 

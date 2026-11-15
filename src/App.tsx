@@ -52,6 +52,7 @@ import { TeamLoginGate } from './components/TeamLoginGate';
 import { TeamAccountRegistrationModal } from './components/TeamAccountRegistrationModal';
 import { PlayerSearchView } from './components/PlayerSearchView';
 import { RegisteredTeamsView } from './components/RegisteredTeamsView';
+import { TournamentStandingsView } from './components/TournamentStandingsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { normalizeWhatsAppNumber } from './utils/phone';
 import type { WhatsAppCountry } from './utils/phone';
@@ -898,11 +899,18 @@ function MainApp() {
 
           {/* TAB 3: REGISTERED TEAMS VIEW */}
           {activeTab === 'registered_teams' && activeTournament && (
+            <>
+            <TournamentStandingsView
+              tournament={tournaments.find((tournament) => tournament.id === activeTournament.id) || activeTournament}
+              teams={allTeams}
+              results={publishedResults}
+            />
             <RegisteredTeamsView
               teams={currentTeams}
               tournament={activeTournament}
               onRegisterClick={PUBLIC_READ_ONLY || myRegistrations.some((registration) => registration.tournament.id === activeTournament.id) ? undefined : () => handleOpenRegistration(activeTournament || undefined)}
             />
+            </>
           )}
 
           {/* TAB 4: PLAYER SEARCH VIEW */}
