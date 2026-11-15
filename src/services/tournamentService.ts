@@ -157,17 +157,22 @@ export async function verifyTeamWhatsAppForLogin(accountId: string, teamName: st
   return whatsappNumber;
 }
 
-export async function saveTeamAccountEdits(accountId: string, teamName: string, whatsappNumber: string, teamLogo: string, players: Player[]): Promise<Pick<TeamProfile, 'teamLogo' | 'leaderName' | 'players'>> {
+export async function saveTeamAccountEdits(accountId: string, teamName: string, currentWhatsAppNumber: string, nextWhatsAppNumber: string, nextWhatsAppCountry: 'BD' | 'NP', teamLogo: string, players: Player[]): Promise<Pick<TeamProfile, 'teamLogo' | 'leaderName' | 'players' | 'whatsappNumber'>> {
   if (!accountId.startsWith('account_')) throw new Error('This legacy profile cannot be edited yet. Contact the organizer to update it.');
   if (!teamLogo || teamLogo.length > 300_000) throw new Error('Upload a valid team logo image.');
   const mainPlayers = players.filter((player) => player.role === 'main').sort((a, b) => a.slotIndex - b.slotIndex);
   if (mainPlayers.length !== 4 || mainPlayers.some((player) => !player.name.trim()) || players.length < 4 || players.length > 5) throw new Error('Add all four main players.');
-  const country = whatsappNumber.startsWith('+977') ? 'NP' : 'BD';
-  await verifyTeamWhatsAppForLogin(accountId, teamName, whatsappNumber, country);
+  const currentCountry = currentWhatsAppNumber.startsWith('+977') ? 'NP' : 'BD';
+  await verifyTeamWhatsAppForLogin(accountId, teamName, currentWhatsAppNumber, currentCountry);
+  const nextNumber = normalizeWhatsAppNumber(nextWhatsAppNumber, nextWhatsAppCountry);
+  if (!nextNumber) throw new Error(`Enter a valid ${nextWhatsAppCountry === 'BD' ? 'Bangladesh' : 'Nepal'} WhatsApp number.`);
   const updatedPlayers = players.map((player) => ({ ...player, name: player.name.trim() }));
   const leaderName = mainPlayers[0].name.trim();
-  await updateDoc(doc(db, 'team_accounts', accountId), { teamLogo, leaderName, players: updatedPlayers, updatedAt: new Date().toISOString() });
-  return { teamLogo, leaderName, players: updatedPlayers };
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'team_accounts', accountId), { teamLogo, leaderName, players: updatedPlayers, updatedAt: new Date().toISOString() });
+  batch.update(doc(db, 'team_account_contacts', accountId), { whatsappNumber: nextNumber });
+  await batch.commit();
+  return { teamLogo, leaderName, players: updatedPlayers, whatsappNumber: nextNumber };
 }
 
 export async function updateTeamAccountStatus(accountId: string, status: TeamAccount['status']): Promise<void> {
