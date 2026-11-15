@@ -52,7 +52,6 @@ import {
   deleteMatchResult,
   setTeamBanned,
   calcPoints,
-  buildLeaderboard,
   publishTournamentResults,
   subscribeTeamAccounts,
   creditTeamWallet,
@@ -73,6 +72,17 @@ interface Props {
 }
 
 const DEFAULT_GROUP_SIZE = 12;
+
+function resultGroupLabel(index: number): string {
+  let value = index + 1;
+  let label = '';
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+  return `GROUP-${label}`;
+}
 
 async function processTournamentImage(file: File): Promise<string> {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPG, or WebP image.');
@@ -237,6 +247,9 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [resSaving, setResSaving] = useState(false);
   const [resMsg, setResMsg] = useState<string | null>(null);
   const [showStandingsPreview, setShowStandingsPreview] = useState(false);
+  const [previewTournamentId, setPreviewTournamentId] = useState(activeTournament.id);
+  const [previewGroup, setPreviewGroup] = useState('all');
+  const [previewMapNumber, setPreviewMapNumber] = useState(1);
 
   // Sync when activeTournament changes
   useEffect(() => {
@@ -724,14 +737,30 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (bResult) return 1;
     return (a.createdAt || '').localeCompare(b.createdAt || '') || a.teamName.localeCompare(b.teamName);
   });
-  const overallLeaderboard = buildLeaderboard(tourResults);
-  const overallRows = [...new Map([
-    ...resultRegisteredTeams.map((team) => [team.teamName.trim().toLocaleLowerCase(), team.teamName] as const),
-    ...overallLeaderboard.map((entry) => [entry.teamName.trim().toLocaleLowerCase(), entry.teamName] as const),
-  ]).values()].map((teamName) => {
-    const result = overallLeaderboard.find((entry) => entry.teamName.trim().toLocaleLowerCase() === teamName.trim().toLocaleLowerCase());
-    return { teamName, booyah: result?.wins || 0, kills: result?.kills || 0, positionPoints: Math.max(0, (result?.points || 0) - (result?.kills || 0)), total: result?.points || 0, maps: result?.matches || 0 };
-  }).sort((a, b) => b.total - a.total || b.booyah - a.booyah || b.kills - a.kills || a.teamName.localeCompare(b.teamName));
+  const previewTournament = tournaments.find((tournament) => tournament.id === previewTournamentId) || selectedResultsTournament;
+  const previewRegisteredTeamsSource = allRegisteredTeams.filter((team) => team.tournamentId === previewTournament.id && team.status === 'approved');
+  const previewRegisteredTeams = [...(previewRegisteredTeamsSource.length ? previewRegisteredTeamsSource : teams.filter((team) => team.tournamentId === previewTournament.id && team.status === 'approved'))]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id));
+  const previewGroupsEnabled = previewTournament.groupsEnabled === true || previewTournament.unlimitedGroups === true || previewTournament.unlimitedTeams === true;
+  const previewTeamsPerGroup = previewTournament.teamsPerGroup || DEFAULT_GROUP_SIZE;
+  const previewGroupCount = previewGroupsEnabled ? Math.max(1, Number(previewTournament.groupCount) || Math.ceil(previewRegisteredTeams.length / previewTeamsPerGroup) || 1) : 0;
+  const previewTeamGroups = new Map(previewRegisteredTeams.map((team, index) => [team.teamName.trim().toLocaleLowerCase(), resultGroupLabel(Math.floor(index / previewTeamsPerGroup))]));
+  const previewGroupOptions = previewGroupsEnabled ? Array.from({ length: previewGroupCount }, (_, index) => resultGroupLabel(index)) : [];
+  const previewTournamentResults = results.filter((result) => result.tournamentId === previewTournament.id);
+  const previewMapOptions = Array.from(new Set([...previewTournamentResults.map((result) => result.mapNumber || 1), previewMapNumber])).sort((a, b) => a - b);
+  const previewRows = previewRegisteredTeams
+    .filter((team) => previewGroup === 'all' || previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) === previewGroup)
+    .map((team) => ({
+      team,
+      group: previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) || 'OPEN FIELD',
+      result: previewTournamentResults.find((entry) => (entry.mapNumber || 1) === previewMapNumber && entry.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase()),
+    }))
+    .sort((a, b) => {
+      if (a.result && b.result) return a.result.position - b.result.position || b.result.kills - a.result.kills;
+      if (a.result) return -1;
+      if (b.result) return 1;
+      return new Date(a.team.createdAt).getTime() - new Date(b.team.createdAt).getTime() || a.team.id.localeCompare(b.team.id);
+    });
   const draftTourResults = tourResults.filter((result) => result.published === false);
   const publishedTourResults = results
     .filter((result) => result.published !== false)
@@ -1397,7 +1426,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} entry preview</div>
                           <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name} · {selectedMapResults.length}/{resultRegisteredTeams.length} teams entered</div>
                         </div>
-                        <button type="button" onClick={() => setShowStandingsPreview(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
+                        <button type="button" onClick={() => { setPreviewTournamentId(resultsTournamentId); setPreviewGroup((selectedResultsTournament.groupsEnabled || selectedResultsTournament.unlimitedGroups || selectedResultsTournament.unlimitedTeams) ? resultGroupLabel(0) : 'all'); setPreviewMapNumber(resMapNumber); setShowStandingsPreview(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left text-[10px]">
@@ -1476,36 +1505,55 @@ export const AdminPanelModal: React.FC<Props> = ({
 
               {tab === 'results' && showStandingsPreview && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-3 backdrop-blur-md sm:p-6" onClick={() => setShowStandingsPreview(false)}>
-                  <section role="dialog" aria-modal="true" aria-label="Overall standings preview" onClick={(event) => event.stopPropagation()} className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-lime-300/20 bg-[#032c1b] text-white shadow-[0_24px_100px_rgba(0,0,0,.7)] sm:rounded-3xl">
+                  <section role="dialog" aria-modal="true" aria-label="Tournament standings preview" onClick={(event) => event.stopPropagation()} className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-lime-300/20 bg-[#032c1b] text-white shadow-[0_24px_100px_rgba(0,0,0,.7)] sm:rounded-3xl">
                     <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-lime-300/10 blur-[100px]" />
                     <div className="relative flex items-start justify-between gap-4 border-b border-lime-200/10 px-4 py-4 sm:px-7 sm:py-5">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-lime-200 sm:text-[10px]"><span className="h-px w-6 bg-lime-300" /> Tournament standings preview</div>
-                        <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{selectedResultsTournament.name}</h2>
-                        <p className="mt-1 text-[10px] text-lime-100/55 sm:text-xs">OVERALL STANDINGS · {new Set(tourResults.map((result) => result.mapNumber || 1)).size} maps recorded</p>
+                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-lime-200 sm:text-[10px]"><span className="h-px w-6 bg-lime-300" /> Tournament standings</div>
+                        <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{previewTournament.name}</h2>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-lime-100/60 sm:text-xs">{previewGroup === 'all' ? 'All groups' : previewGroup} · Match {previewMapNumber}</p>
                       </div>
                       <button type="button" onClick={() => setShowStandingsPreview(false)} aria-label="Close preview" className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={18} /></button>
                     </div>
                     <div className="relative min-h-0 flex-1 overflow-auto p-3 sm:p-6">
+                      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Tournament
+                          <select value={previewTournament.id} onChange={(event) => { setPreviewTournamentId(event.target.value); setPreviewGroup('all'); setPreviewMapNumber(1); }} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                            {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Group
+                          <select value={previewGroup} onChange={(event) => setPreviewGroup(event.target.value)} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                            <option value="all">All groups</option>
+                            {previewGroupOptions.map((group) => <option key={group} value={group}>{group}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Match
+                          <select value={previewMapNumber} onChange={(event) => setPreviewMapNumber(Number(event.target.value))} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                            {previewMapOptions.map((mapNumber) => <option key={mapNumber} value={mapNumber}>Match {mapNumber}</option>)}
+                          </select>
+                        </label>
+                      </div>
                       <div className="overflow-hidden rounded-xl border border-lime-300/15 bg-[#052415] sm:rounded-2xl">
                         <div className="overflow-x-auto">
-                          <table className="w-full min-w-[620px] border-separate border-spacing-y-1.5 px-2 py-2 text-left sm:border-spacing-y-2 sm:px-3 sm:py-3">
+                          <table className="w-full min-w-[680px] border-separate border-spacing-y-1.5 px-2 py-2 text-left sm:border-spacing-y-2 sm:px-3 sm:py-3">
                             <thead>
                               <tr className="text-[9px] font-black uppercase tracking-wider text-[#062c1b] sm:text-xs">
-                                {['#', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading) => <th key={heading} className={`bg-lime-300 px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 sm:py-3 ${heading === 'Team name' ? 'w-[45%] text-left' : 'text-center'}`}>{heading}</th>)}
+                                {['#', 'Logo', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading) => <th key={heading} className={`bg-lime-300 px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 sm:py-3 ${heading === 'Team name' ? 'w-[36%] text-left' : 'text-center'}`}>{heading}</th>)}
                               </tr>
                             </thead>
                             <tbody>
-                              {overallRows.length ? overallRows.map((row, index) => (
-                                <tr key={row.teamName} className="text-xs font-extrabold sm:text-sm">
+                              {previewRows.length ? previewRows.map(({ team, result }, index) => (
+                                <tr key={team.id} className={`text-xs font-extrabold sm:text-sm ${result?.position === 1 ? 'text-lime-100' : ''}`}>
                                   <td className="rounded-l-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{String(index + 1).padStart(2, '0')}</td>
-                                  <td className="bg-[#0a5734] px-3 py-3 text-white sm:px-4">{row.teamName}</td>
-                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{row.booyah ? String(row.booyah).padStart(2, '0') : '—'}</td>
-                                  <td className="bg-[#0a5734] px-3 py-3 text-center tabular-nums text-white">{row.kills}</td>
-                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{row.positionPoints}</td>
-                                  <td className="rounded-r-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{row.total}</td>
+                                  <td className="bg-[#0a5734] px-2 py-2 text-center"><span className="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-lime-100/15 bg-black/25 text-[9px] font-black text-lime-100">{team.teamLogo ? <img src={team.teamLogo} alt="" className="h-full w-full object-cover" /> : team.teamName.trim().slice(0, 2).toUpperCase()}</span></td>
+                                  <td className="bg-[#0a5734] px-3 py-3 text-white sm:px-4">{team.teamName}</td>
+                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{result ? (result.position === 1 ? '01' : '—') : '—'}</td>
+                                  <td className="bg-[#0a5734] px-3 py-3 text-center tabular-nums text-white">{result ? result.kills : '—'}</td>
+                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{result ? calcPoints(result.position, 0) : '—'}</td>
+                                  <td className="rounded-r-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{result ? result.points : '—'}</td>
                                 </tr>
-                              )) : <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-lime-100/55">No teams registered in this tournament yet.</td></tr>}
+                              )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-lime-100/55">No approved teams registered for this group yet.</td></tr>}
                             </tbody>
                           </table>
                         </div>
