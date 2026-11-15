@@ -17,7 +17,6 @@ import {
   Trophy,
   Zap,
   DollarSign,
-  ArrowRight,
   CheckCircle,
   MapPin,
   Calendar,
@@ -45,7 +44,6 @@ import {
   subscribeTeamWallet,
   subscribeTeamAccounts,
 } from './services/tournamentService';
-import { LeaderboardView } from './components/LeaderboardView';
 import { testConnection } from './lib/firebase';
 import { sendDiscordEvent } from './lib/discordEvents';
 import { RegistrationModal } from './components/RegistrationModal';
@@ -115,8 +113,8 @@ function tournamentGroupLabel(index: number): string {
 function MainApp() {
   const { isAdmin } = useAuth();
 
-  // Navigation Views: 'tournaments' | 'leaderboard' | 'player_search' (+ 'registered_teams' opened from a tournament card)
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'my_tournaments' | 'leaderboard' | 'registered_teams' | 'player_search'>('tournaments');
+  // Navigation views include tournament pages, the player leaderboard, and registered teams.
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'my_tournaments' | 'registered_teams' | 'player_search'>('tournaments');
   const [categoryFilter, setCategoryFilter] = useState<'all' | TournamentCategory>('all');
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -558,8 +556,7 @@ function MainApp() {
             {[
               { key: 'tournaments', label: 'Tournaments', icon: <Flame size={17} />, tint: 'text-indigo-400' },
               { key: 'my_tournaments', label: 'My Tournaments', icon: <CalendarDays size={17} />, tint: 'text-cyan-300' },
-              { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy size={17} />, tint: 'text-amber-400' },
-              { key: 'player_search', label: 'All Teams', icon: <Search size={17} />, tint: 'text-emerald-400' },
+              { key: 'player_search', label: 'Leaderboard', icon: <Trophy size={17} />, tint: 'text-amber-400' },
             ].map((item) => {
               const active = activeTab === item.key || (item.key === 'tournaments' && activeTab === 'registered_teams');
               return (
@@ -661,12 +658,12 @@ function MainApp() {
               <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Tournament arena'
-                  : activeTab === 'my_tournaments' ? 'My Tournaments' : activeTab === 'leaderboard' ? 'Hall of champions' : 'Squad roster'}
+                  : activeTab === 'my_tournaments' ? 'My Tournaments' : 'Player Leaderboard'}
               </h1>
               <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Find your next Free Fire scrim and secure your squad’s place.'
-                  : activeTab === 'my_tournaments' ? 'Your squad’s registrations. Select a tournament to view its registered teams.' : activeTab === 'leaderboard' ? 'Every match. Every Booyah. One standings board.' : 'Open any squad to see its players and how many matches each has played.'}
+                  : activeTab === 'my_tournaments' ? 'Your squad’s registrations. Select a tournament to view its registered teams.' : 'Rankings for every registered player, based on published match results.'}
               </p>
             </div>
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
@@ -853,7 +850,7 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* Right Column: My Team + Top Teams */}
+              {/* Right Column: My Team */}
               <div className={PUBLIC_READ_ONLY ? 'hidden' : 'hidden lg:block lg:col-span-4 space-y-6'}>
                 {/* MY TEAM CARD */}
                 <div className="relative overflow-hidden bg-gradient-to-br from-[#1d1a1a] to-[#131419] border border-[#282934] rounded-2xl p-5 sm:p-6 shadow-xl">
@@ -884,59 +881,12 @@ function MainApp() {
                   </div>
                 </div>
 
-                {/* TOP TEAMS CARD */}
-                <div className="bg-[#131620] border border-[#23242e] rounded-2xl p-5 sm:p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#20212a]">
-                    <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                      <Trophy size={15} className="text-amber-400" /> Top Teams
-                    </h4>
-                    <button
-                      onClick={() => setActiveTab('leaderboard')}
-                      className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1"
-                    >
-                      View all <ArrowRight size={12} />
-                    </button>
-                  </div>
 
-                  {leaderboard.length === 0 ? (
-                    <p className="text-xs text-gray-500 text-center py-4">Ekhono kono match result nei.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {leaderboard.slice(0, 8).map((entry, i) => (
-                        <div
-                          key={entry.teamName}
-                          className="flex items-center justify-between text-xs py-2 px-2.5 hover:bg-[#181c2b] rounded-lg transition-colors"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span
-                              className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[11px] shrink-0 ${
-                                i === 0
-                                  ? 'bg-amber-500/20 text-amber-300'
-                                  : i === 1
-                                  ? 'bg-slate-400/20 text-slate-200'
-                                  : i === 2
-                                  ? 'bg-orange-500/20 text-orange-300'
-                                  : 'bg-[#1e1f27] text-gray-400'
-                              }`}
-                            >
-                              {i + 1}
-                            </span>
-                            <span className="font-semibold text-gray-200 truncate">{entry.teamName}</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="text-[10px] text-amber-300 font-bold">{entry.wins}W</span>
-                            <span className="font-mono font-bold text-gray-300">{entry.points}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: LEADERBOARD */}
+          {/* My squad registrations */}
           {activeTab === 'my_tournaments' && (
             <section className="space-y-4">
               <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
@@ -944,10 +894,6 @@ function MainApp() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament, groupName }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div>{(tournament.groupsEnabled || tournament.unlimitedGroups || tournament.unlimitedTeams) && <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/[.08] px-3 py-2 text-violet-100">{groupName ? <><span className="text-[9px] font-bold uppercase tracking-wider text-violet-200/70">Your Group</span><span className="ml-auto text-sm font-black tracking-wide">{groupName}</span></> : <span className="text-[10px] font-semibold">Group assignment is being prepared</span>}</div>}<div className="mt-3 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
               )}
             </section>
-          )}
-
-          {activeTab === 'leaderboard' && (
-            <LeaderboardView results={publishedResults} tournaments={tournaments} />
           )}
 
           {/* TAB 3: REGISTERED TEAMS VIEW */}
