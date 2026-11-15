@@ -433,12 +433,13 @@ function MainApp() {
         {showTeamAccountRegistration && (
           <TeamAccountRegistrationModal
             onClose={() => setShowTeamAccountRegistration(false)}
-            onSuccess={async (account) => {
+            onSuccess={async (account, whatsappNumber) => {
               const profile: TeamProfile = {
                 userId: account.id,
                 teamName: account.teamName,
                 teamLogo: account.teamLogo,
                 leaderName: account.leaderName,
+                whatsappNumber,
                 players: account.players,
                 updatedAt: account.updatedAt,
               };

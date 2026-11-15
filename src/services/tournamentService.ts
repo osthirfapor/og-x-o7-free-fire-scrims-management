@@ -85,10 +85,12 @@ export async function isTeamNameBanned(teamName: string): Promise<boolean> {
   return snapshot.exists() && snapshot.data().enabled === true;
 }
 
-export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; players: Player[] }): Promise<TeamAccount> {
+export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; whatsappNumber: string; players: Player[] }): Promise<TeamAccount> {
   const teamName = params.teamName.trim();
   const leaderName = params.leaderName.trim();
   if (!teamName || !leaderName || !params.teamLogo.trim()) throw new Error('Complete your team name, captain IGN, and logo.');
+  const normalizedWhatsAppNumber = normalizeWhatsAppNumber(params.whatsappNumber, 'BD') || normalizeWhatsAppNumber(params.whatsappNumber, 'NP');
+  if (!normalizedWhatsAppNumber || normalizedWhatsAppNumber !== params.whatsappNumber) throw new Error('Enter a valid Bangladesh or Nepal WhatsApp number.');
   if (params.players.length < 4 || params.players.length > 5 || params.players.slice(0, 4).some((player) => !player.name.trim())) throw new Error('Add all four main players.');
   if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registration. Contact the organizer.');
   const normalizedTeam = teamName.toLocaleLowerCase();
@@ -110,7 +112,10 @@ export async function createTeamAccount(params: { teamName: string; teamLogo: st
     createdAt: now,
     updatedAt: now,
   };
-  await setDoc(doc(db, 'team_accounts', id), account);
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'team_accounts', id), account);
+  batch.set(doc(db, 'team_account_contacts', id), { teamName, whatsappNumber: normalizedWhatsAppNumber, createdAt: now });
+  await batch.commit();
   void sendDiscordEvent('team_account_created', {
     'Team name': account.teamName,
     'Captain IGN': account.leaderName,
