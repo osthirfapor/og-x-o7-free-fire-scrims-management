@@ -159,6 +159,33 @@ export async function updateTeamAccountStatus(accountId: string, status: TeamAcc
   await updateDoc(doc(db, 'team_accounts', accountId), { status, updatedAt: new Date().toISOString() });
 }
 
+export async function deleteTeamDatabaseRecord(teamNameInput: string): Promise<void> {
+  const teamKey = teamNameInput.trim().normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ');
+  if (!teamKey) throw new Error('Team name is required.');
+  const [accounts, contacts, tournaments] = await Promise.all([
+    getDocs(collection(db, 'team_accounts')),
+    getDocs(collection(db, 'team_account_contacts')),
+    getDocs(collection(db, 'tournaments')),
+  ]);
+  const sameTeam = (data: Record<string, unknown>) => String(data.teamName || '').trim().normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ') === teamKey;
+  const accountIds = accounts.docs.filter((item) => sameTeam(item.data())).map((item) => item.id);
+  const registrations = await Promise.all(tournaments.docs.map(async (tournament) => {
+    const snapshot = await getDocs(collection(db, 'tournaments', tournament.id, 'teams'));
+    return snapshot.docs.filter((item) => sameTeam(item.data())).map((item) => ({ tournamentId: tournament.id, teamId: item.id }));
+  }));
+  for (const registration of registrations.flat()) await deleteTeam(registration.tournamentId, registration.teamId);
+  const refs = [
+    ...accounts.docs.filter((item) => accountIds.includes(item.id)).map((item) => item.ref),
+    ...contacts.docs.filter((item) => sameTeam(item.data()) || accountIds.includes(item.id)).map((item) => item.ref),
+    ...accountIds.map((id) => doc(db, 'team_login_checks', id)),
+  ];
+  for (let offset = 0; offset < refs.length; offset += 450) {
+    const batch = writeBatch(db);
+    refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+}
+
 export async function setTeamBanned(teamName: string, enabled: boolean): Promise<void> {
   const banRef = doc(db, 'banned_teams', teamBanDocId(teamName));
   if (enabled) {

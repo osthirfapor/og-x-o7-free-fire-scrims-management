@@ -58,6 +58,7 @@ import {
   subscribeTeamWallets,
   subscribeTeams,
   subscribeTeamAccountContacts,
+  deleteTeamDatabaseRecord,
   removePublicWhatsAppFromTeamRecords,
 } from '../services/tournamentService';
 
@@ -124,6 +125,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [expandedDatabaseTeam, setExpandedDatabaseTeam] = useState<string | null>(null);
   const [openDatabaseLoginMenu, setOpenDatabaseLoginMenu] = useState<string | null>(null);
   const [copiedDatabaseLogin, setCopiedDatabaseLogin] = useState<string | null>(null);
+  const [copiedDatabasePhone, setCopiedDatabasePhone] = useState<string | null>(null);
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -367,6 +369,30 @@ export const AdminPanelModal: React.FC<Props> = ({
       window.prompt('Copy team login details:', details);
     }
     setOpenDatabaseLoginMenu(null);
+  };
+
+  const copySquadPhone = async (squad: { teamName: string; whatsappNumber?: string }) => {
+    if (!squad.whatsappNumber) return;
+    try {
+      await navigator.clipboard.writeText(squad.whatsappNumber);
+      setCopiedDatabasePhone(squadKey(squad.teamName));
+      window.setTimeout(() => setCopiedDatabasePhone(null), 2200);
+    } catch {
+      window.prompt('Copy WhatsApp number:', squad.whatsappNumber);
+    }
+  };
+
+  const handleDeleteDatabaseRecord = async (squad: { teamName: string }) => {
+    if (!confirm(`Delete ${squad.teamName} from the team database and remove its registrations from every tournament? Paid entry fees will be refunded to its wallet. This will keep the wallet and published match results.`)) return;
+    setDeletingSquadName(squad.teamName);
+    try {
+      await deleteTeamDatabaseRecord(squad.teamName);
+      recordAdminActivity('team_database_deleted', `Deleted ${squad.teamName}'s database profile and tournament registrations.`, squad.teamName);
+    } catch (error) {
+      alert(error instanceof Error ? `Could not delete team database record: ${error.message}` : 'Could not delete team database record.');
+    } finally {
+      setDeletingSquadName(null);
+    }
   };
 
   // Toggle registration directly from the Scrims list.
@@ -930,14 +956,15 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <div className="flex items-center gap-2 px-3 py-2">
                         <button type="button" onClick={() => setExpandedDatabaseTeam(expanded ? null : key)} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                           <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/30">{squad.teamLogo ? <img src={squad.teamLogo} alt="" className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-cyan-200">{squad.teamName.slice(0, 2).toUpperCase()}</span>}</span>
-                          <span className="truncate text-xs font-extrabold text-white">{squad.teamName}</span>
-                          <span className="text-[10px] text-slate-500">{squad.players.length} players</span>
+                          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-extrabold text-white">{squad.teamName}</span>{squad.whatsappNumber && <span className="mt-0.5 block truncate text-[10px] text-emerald-200">WhatsApp: {squad.whatsappNumber}</span>}</span>
+                          <span className="shrink-0 text-[10px] text-slate-500">{squad.players.length} players</span>
                           {expanded ? <ChevronUp size={14} className="ml-auto shrink-0 text-slate-400"/> : <ChevronDown size={14} className="ml-auto shrink-0 text-slate-400"/>}
                         </button>
                         {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Message ${squad.teamName} on WhatsApp`} title={`Send WhatsApp message${squad.whatsappNumber ? ` to ${squad.whatsappNumber}` : ''}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] text-emerald-200 hover:bg-emerald-300/15"><MessageCircle size={15}/></a> : <span title="No WhatsApp number saved" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.06] text-slate-600"><MessageCircle size={14}/></span>}
+                        {squad.whatsappNumber && <button type="button" onClick={() => void copySquadPhone(squad)} aria-label={`Copy ${squad.teamName} WhatsApp number`} title={copiedDatabasePhone === key ? 'Number copied' : 'Copy WhatsApp number'} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.08] bg-white/[.03] text-slate-400 hover:bg-white/[.08] hover:text-white">{copiedDatabasePhone === key ? <Check size={14} className="text-emerald-300"/> : <Copy size={14}/>}</button>}
                         <div className="relative shrink-0">
                           <button type="button" aria-label={`More options for ${squad.teamName}`} aria-expanded={openDatabaseLoginMenu === key} onClick={() => setOpenDatabaseLoginMenu((open) => open === key ? null : key)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/[.08] bg-white/[.03] text-slate-400 hover:bg-white/[.08] hover:text-white"><MoreVertical size={15}/></button>
-                          {openDatabaseLoginMenu === key && <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => void copySquadLoginDetails(squad)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.07]">{copiedDatabaseLogin === key ? 'Copied login details' : 'Copy login details'}</button></div>}
+                          {openDatabaseLoginMenu === key && <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => void copySquadLoginDetails(squad)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.07]">{copiedDatabaseLogin === key ? 'Copied login details' : 'Copy login details'}</button><button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => { setOpenDatabaseLoginMenu(null); void handleDeleteDatabaseRecord(squad); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08] disabled:opacity-50">{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete database record'}</button></div>}
                         </div>
                       </div>
                       {expanded && <div className="flex flex-wrap gap-1.5 border-t border-white/[.07] bg-black/10 px-3 py-2.5">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.name}</span>)}</div>}
