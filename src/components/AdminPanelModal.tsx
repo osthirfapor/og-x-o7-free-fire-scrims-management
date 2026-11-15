@@ -43,7 +43,6 @@ import {
   deleteTournament,
   updateTeam,
   deleteTeam,
-  deleteRegisteredTeamEverywhere,
   subscribeRegistrationLogs,
   subscribeAdminActivityLogs,
   writeAdminActivityLog,
@@ -655,17 +654,24 @@ export const AdminPanelModal: React.FC<Props> = ({
     const q = databaseTeamSearch.toLocaleLowerCase().trim();
     return !q || `${squad.teamName} ${squad.players.map((player) => player.name).join(' ')}`.toLocaleLowerCase().includes(q);
   });
-  const handleDeleteSquadEverywhere = async (squad: (typeof registeredSquads)[number]) => {
-    if (!confirm(`Permanently delete ${squad.teamName} and its team account, all scrim registrations, match results, registration logs, and wallet balance?`)) return;
+  const handleRemoveSquadFromTournament = async (squad: (typeof registeredSquads)[number]) => {
+    if (!squadTournamentFilter) return;
+    const registration = allRegisteredTeams.find((team) => team.tournamentId === squadTournamentFilter
+      && squadKey(team.teamName) === squadKey(squad.teamName));
+    if (!registration) return;
+    const tournamentName = tournaments.find((item) => item.id === squadTournamentFilter)?.name || 'this tournament';
+    const refundText = tournaments.find((item) => item.id === squadTournamentFilter)?.category === 'paid'
+      ? ' The entry fee will be returned to the team wallet.'
+      : '';
+    if (!confirm(`Remove ${squad.teamName} from ${tournamentName} only? The team account and its other tournament records will stay, and it can register here again.${refundText}`)) return;
     setDeletingSquadName(squad.teamName);
     setSquadDeleteMessage(null);
     try {
-      await deleteRegisteredTeamEverywhere(squad.teamName);
-      recordAdminActivity('team_deleted_globally', 'Deleted a team and all associated registrations, results, logs, and wallet data.');
-      if (walletTeamName.trim().toLocaleLowerCase() === squad.teamName.trim().toLocaleLowerCase()) setWalletTeamName('');
-      setSquadDeleteMessage(`${squad.teamName} was deleted from all website records.`);
+      await deleteTeam(registration.tournamentId, registration.id);
+      recordAdminActivity('team_removed', `Removed ${squad.teamName} from ${tournamentName}; the squad account and other registrations remain available.`, squad.teamName);
+      setSquadDeleteMessage(`${squad.teamName} was removed from ${tournamentName}. It can register again.`);
     } catch (error) {
-      setSquadDeleteMessage(error instanceof Error ? `Delete failed: ${error.message}` : 'Delete failed. Please retry.');
+      setSquadDeleteMessage(error instanceof Error ? `Remove failed: ${error.message}` : 'Remove failed. Please retry.');
     } finally {
       setDeletingSquadName(null);
     }
@@ -863,7 +869,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad directory</div><h3 className="mt-1 text-lg font-extrabold text-white">Registered Teams</h3><p className="mt-1 text-xs text-slate-400">Every registered squad, its players, and scrims joined.</p></div>
                     <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={squadSearch} onChange={(event) => setSquadSearch(event.target.value)} placeholder="Search team, IGN, or scrim" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
                   </div>
-                  {squadTournamentFilter && <div className="flex items-center justify-between rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-2 text-[11px] text-cyan-100"><span>Scrim filter: {tournaments.find((item) => item.id === squadTournamentFilter)?.name || 'Selected scrim'}</span><button type="button" onClick={() => setSquadTournamentFilter(null)} className="font-bold hover:text-white">Show all teams</button></div>}
+                  {squadTournamentFilter && <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-2 text-[11px] text-cyan-100"><span>Tournament: {tournaments.find((item) => item.id === squadTournamentFilter)?.name || 'Selected scrim'}</span></div>}
                   {squadDeleteMessage && <div role="status" className="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-[11px] text-slate-200">{squadDeleteMessage}</div>}
                   {visibleRegisteredSquads.length ? <div className="space-y-2">{visibleRegisteredSquads.map((squad, index) => {
                     const key = squadKey(squad.teamName);
@@ -880,7 +886,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           {expanded ? <ChevronUp size={15} className="shrink-0 text-slate-400"/> : <ChevronDown size={15} className="shrink-0 text-slate-400"/>}
                         </button>
                         {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Message ${squad.teamName} on WhatsApp`} title="Send WhatsApp message" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] text-emerald-200 hover:bg-emerald-300/15"><MessageCircle size={15}/></a> : <span title="No WhatsApp number saved" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.06] text-slate-600"><MessageCircle size={14}/></span>}
-                        <button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => void handleDeleteSquadEverywhere(squad)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-300/15 bg-rose-300/[.06] px-2 py-2 text-[9px] font-bold text-rose-200 transition hover:bg-rose-300/[.12] disabled:opacity-50"><Trash2 size={12}/><span className="hidden sm:inline">{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete'}</span></button>
+                        {squadTournamentFilter && <button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => void handleRemoveSquadFromTournament(squad)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-300/15 bg-rose-300/[.06] px-2 py-2 text-[9px] font-bold text-rose-200 transition hover:bg-rose-300/[.12] disabled:opacity-50"><Trash2 size={12}/><span className="hidden sm:inline">{deletingSquadName === squad.teamName ? 'Removing…' : 'Remove from scrim'}</span></button>}
                       </div>
                       {expanded && <div className="grid gap-3 border-t border-white/[.07] bg-black/10 px-3 py-3 sm:grid-cols-2">
                         <div><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Player names</div><div className="flex flex-wrap gap-1">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div></div>

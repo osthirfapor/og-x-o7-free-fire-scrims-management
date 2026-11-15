@@ -530,19 +530,33 @@ export async function deleteTeam(tournamentId: string, teamId: string) {
   try {
     const tournamentRef = doc(db, 'tournaments', tournamentId);
     const teamRef = doc(db, 'tournaments', tournamentId, 'teams', teamId);
+    const registrationLogRef = doc(db, 'registration_logs', teamId);
 
     await runTransaction(db, async (tx) => {
-      const tourSnap = await tx.get(tournamentRef);
-      if (tourSnap.exists()) {
-        const tour = tourSnap.data() as Tournament;
-        const newCount = Math.max(0, (tour.registeredCount || 1) - 1);
+      const [tourSnap, teamSnap] = await Promise.all([tx.get(tournamentRef), tx.get(teamRef)]);
+      if (!teamSnap.exists()) return;
+      const team = teamSnap.data() as Team;
+      const tour = tourSnap.exists() ? tourSnap.data() as Tournament : null;
+      const isPaidTournament = tour?.category === 'paid';
+      const refundAmount = isPaidTournament ? Number(tour.entryFeeAmount ?? tour.entryFee ?? 0) : 0;
+      const walletKey = team.walletKey || teamWalletDocId(team.teamName);
+      const walletRef = doc(db, 'team_wallets', walletKey);
+      const walletSnap = isPaidTournament && refundAmount > 0 ? await tx.get(walletRef) : null;
+      const now = new Date().toISOString();
+      if (tour) {
+        const newCount = Math.max(0, (tour.registeredCount || 0) - 1);
         tx.update(tournamentRef, {
           registeredCount: newCount,
           status: tour.status === 'closed' && newCount < tour.maxTeams ? 'open' : tour.status,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
         });
       }
+      if (walletSnap && refundAmount > 0) {
+        const balance = Number(walletSnap.data().balance) || 0;
+        tx.update(walletRef, { balance: Math.round((balance + refundAmount) * 100) / 100, updatedAt: now });
+      }
       tx.delete(teamRef);
+      tx.delete(registrationLogRef);
     });
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `tournaments/${tournamentId}/teams/${teamId}`);
