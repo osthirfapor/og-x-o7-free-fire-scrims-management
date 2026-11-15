@@ -714,11 +714,18 @@ export const AdminPanelModal: React.FC<Props> = ({
     .filter((r) => r.tournamentId === selectedResultsTournament.id)
     .sort((a, b) => (a.mapNumber || 1) - (b.mapNumber || 1) || a.position - b.position || b.kills - a.kills);
   const selectedMapResults = tourResults.filter((result) => (result.mapNumber || 1) === resMapNumber);
+  const selectedMapRows = [...resultRegisteredTeams].sort((a, b) => {
+    const aResult = selectedMapResults.find((result) => result.teamName.trim().toLocaleLowerCase() === a.teamName.trim().toLocaleLowerCase());
+    const bResult = selectedMapResults.find((result) => result.teamName.trim().toLocaleLowerCase() === b.teamName.trim().toLocaleLowerCase());
+    if (aResult && bResult) return aResult.position - bResult.position || bResult.kills - aResult.kills;
+    if (aResult) return -1;
+    if (bResult) return 1;
+    return (a.createdAt || '').localeCompare(b.createdAt || '') || a.teamName.localeCompare(b.teamName);
+  });
   const draftTourResults = tourResults.filter((result) => result.published === false);
   const publishedTourResults = results
     .filter((result) => result.published !== false)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const overallBoard = buildLeaderboard(tourResults);
 
   // Filter teams for current tournament
   const currentTourTeams = teams.filter((t) => t.tournamentId === currentTour.id);
@@ -1370,34 +1377,43 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </div> : <p className="px-3.5 py-5 text-center text-[11px] text-gray-500">No approved teams registered for this tournament.</p>}
                     </section>
 
-                    <div className="bg-[#15161d] border border-[#272833] rounded-xl p-4">
-                      <div className="mb-3 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-300"><span>Map {resMapNumber} standings</span><span className="text-[9px] font-medium normal-case tracking-normal text-gray-500">Booyah · Kills · Position · Total</span></div>
-                      {selectedMapResults.length ? <div className="overflow-x-auto"><table className="w-full min-w-[440px] text-left text-[10px]"><thead className="text-[9px] uppercase tracking-wider text-gray-500"><tr><th className="px-2 py-2">#</th><th className="px-2 py-2">Team</th><th className="px-2 py-2 text-center">Booyah</th><th className="px-2 py-2 text-center">Kills</th><th className="px-2 py-2 text-center">Pos.</th><th className="px-2 py-2 text-right">Total</th></tr></thead><tbody className="divide-y divide-white/[.05]">{selectedMapResults.map((result, index) => <tr key={result.id}><td className="px-2 py-2 font-bold text-slate-500">{String(index + 1).padStart(2, '0')}</td><td className="max-w-[130px] truncate px-2 py-2 font-semibold text-white">{result.teamName}</td><td className="px-2 py-2 text-center font-bold text-amber-200">{result.position === 1 ? '01' : '—'}</td><td className="px-2 py-2 text-center text-slate-200">{result.kills}</td><td className="px-2 py-2 text-center text-slate-200">#{result.position} <span className="text-indigo-300">({calcPoints(result.position, 0)})</span></td><td className="px-2 py-2 text-right font-black text-cyan-200">{result.points}</td></tr>)}</tbody></table></div> : <p className="mb-3 text-xs text-gray-500">No results added for Map {resMapNumber} yet.</p>}
-                      <div className="mt-4 border-t border-white/[.05] pt-3 text-[9px] font-bold uppercase tracking-wider text-gray-500">Overall wins ranking</div>
-                      {overallBoard.length === 0 ? (
-                        <p className="text-xs text-gray-500">Kono result nei.</p>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {overallBoard.slice(0, 10).map((e, i) => (
-                            <div key={e.teamName} className="flex items-center justify-between text-xs bg-[#0d0e13] border border-[#20212a] rounded-lg px-3 py-2">
-                              <span className="flex items-center gap-2 min-w-0">
-                                <span className="font-black text-gray-500 w-4">{i + 1}</span>
-                                <span className="font-semibold text-white truncate">{e.teamName}</span>
-                              </span>
-                              <span className="text-gray-400 shrink-0">
-                                <span className="text-amber-300 font-bold">{e.wins}W</span> • {e.matches} played • {e.points} pts
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+
                   </div>
 
                   <div className="xl:col-span-3 bg-[#15161d] border border-[#272833] rounded-xl p-4">
+                    <section className="mb-4 overflow-hidden rounded-xl border border-cyan-300/15 bg-[#0e1117]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[.06] px-3.5 py-3">
+                        <div>
+                          <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} standings preview</div>
+                          <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name} · {selectedMapResults.length}/{resultRegisteredTeams.length} teams entered</div>
+                        </div>
+                        <span className="rounded-md border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-bold text-cyan-100">LIVE PREVIEW</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[560px] text-left text-[10px]">
+                          <thead className="bg-white/[.025] text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                            <tr><th className="px-3 py-2.5">#</th><th className="px-3 py-2.5">Team name</th><th className="px-3 py-2.5 text-center">Booyah</th><th className="px-3 py-2.5 text-center">Kills</th><th className="px-3 py-2.5 text-center">Position points</th><th className="px-3 py-2.5 text-right">Total</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/[.05]">
+                            {selectedMapRows.length ? selectedMapRows.map((team, index) => {
+                              const result = selectedMapResults.find((entry) => entry.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase());
+                              const placementPoints = result ? calcPoints(result.position, 0) : 0;
+                              return <tr key={team.id} className={result?.position === 1 ? 'bg-amber-300/[.035]' : ''}>
+                                <td className="px-3 py-2.5 font-black tabular-nums text-slate-500">{String(index + 1).padStart(2, '0')}</td>
+                                <td className="max-w-[200px] truncate px-3 py-2.5 font-semibold text-white">{team.teamName}</td>
+                                <td className="px-3 py-2.5 text-center font-bold text-amber-200">{result ? (result.position === 1 ? '01' : '—') : '—'}</td>
+                                <td className="px-3 py-2.5 text-center font-semibold text-slate-200">{result ? result.kills : '—'}</td>
+                                <td className="px-3 py-2.5 text-center text-indigo-200">{result ? `#${result.position} · ${placementPoints}` : 'Pending'}</td>
+                                <td className="px-3 py-2.5 text-right font-black tabular-nums text-cyan-200">{result ? result.points : '—'}</td>
+                              </tr>;
+                            }) : <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-500">Registered teams will appear here after you choose a tournament.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Unpublished Results — {currentTour.name}</div>
+                        <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Unpublished Results — {selectedResultsTournament.name}</div>
                         <span className="text-[11px] text-gray-500">Public leaderboard updates when you publish.</span>
                       </div>
                       <button type="button" disabled={!draftTourResults.length} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-[11px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
