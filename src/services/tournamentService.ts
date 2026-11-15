@@ -593,7 +593,7 @@ export async function deleteTeam(tournamentId: string, teamId: string) {
           updatedAt: now,
         });
       }
-      if (walletSnap && refundAmount > 0) {
+      if (walletSnap?.exists() && refundAmount > 0) {
         const balance = Number(walletSnap.data().balance) || 0;
         tx.update(walletRef, { balance: Math.round((balance + refundAmount) * 100) / 100, updatedAt: now });
       }
