@@ -48,9 +48,6 @@ service cloud.firestore {
           (!exists(/databases/$(database)/documents/team_accounts/$(accountId))
             && existsAfter(/databases/$(database)/documents/team_accounts/$(accountId))
             && request.resource.data.teamName == getAfter(/databases/$(database)/documents/team_accounts/$(accountId)).data.teamName)
-          || (exists(/databases/$(database)/documents/team_accounts/$(accountId))
-            && !exists(/databases/$(database)/documents/team_account_contacts/$(accountId))
-            && request.resource.data.teamName == get(/databases/$(database)/documents/team_accounts/$(accountId)).data.teamName)
         );
       allow update, delete: if isAdmin();
     }

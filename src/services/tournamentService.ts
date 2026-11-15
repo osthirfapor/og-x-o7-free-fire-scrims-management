@@ -147,18 +147,6 @@ export function subscribeTeamAccountContacts(onData: (contacts: { id: string; te
 export async function verifyTeamWhatsAppForLogin(accountId: string, teamName: string, input: string, country: 'BD' | 'NP'): Promise<string> {
   const whatsappNumber = normalizeWhatsAppNumber(input, country);
   if (!whatsappNumber) throw new Error(`Enter a valid ${country === 'BD' ? 'Bangladesh' : 'Nepal'} WhatsApp number.`);
-  try {
-    // Older accounts created before phone collection was added can claim their
-    // first number once; existing contact records cannot be overwritten here.
-    await setDoc(doc(db, 'team_account_contacts', accountId), {
-      teamName,
-      whatsappNumber,
-      createdAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: unknown }).code) : '';
-    if (code !== 'permission-denied') throw error;
-  }
   await setDoc(doc(db, 'team_login_checks', accountId), {
     accountId,
     whatsappNumber,
