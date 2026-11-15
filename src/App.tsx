@@ -653,7 +653,7 @@ function MainApp() {
 
         {/* ================= BODY CONTENT AREA ================= */}
         <div key={activeTab} className="app-main-content flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="page-intro mb-7 flex flex-wrap items-end justify-between gap-4">
+          <div className="page-intro mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-7 sm:gap-4">
             <div>
               <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-indigo-300">
                 <span className="h-px w-6 bg-gradient-to-r from-cyan-300 to-indigo-400" /> OG x o7 competitive hub
@@ -683,19 +683,19 @@ function MainApp() {
                 {/* Formatted in square shape with background graphic and name at bottom, matching image_a54476d2.png */}
                 <div className="space-y-4">
                   {/* Category Pills Header */}
-                  <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
+                  <div className="flex flex-col items-stretch gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                     <div className="flex items-center gap-2">
-                      <LayoutGrid size={18} className="text-purple-400" />
-                      <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      <LayoutGrid size={18} className="shrink-0 text-purple-400" />
+                      <h3 className="text-base font-bold tracking-tight text-white sm:text-lg">
                         All Tournaments
                       </h3>
                     </div>
 
                     {/* Filter buttons */}
-                    <div className="flex items-center gap-1 bg-[#0f1015] p-1 rounded-xl border border-[#23242e] text-xs shrink-0">
+                    <div className="grid grid-cols-4 gap-1 rounded-xl border border-[#23242e] bg-[#0f1015] p-1 text-[11px] sm:flex sm:shrink-0 sm:text-xs">
                       <button
                         onClick={() => setCategoryFilter('all')}
-                        className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                        className={`rounded-lg px-2 py-1.5 font-semibold transition-colors sm:px-3 sm:py-1 ${
                           categoryFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -703,7 +703,7 @@ function MainApp() {
                       </button>
                       <button
                         onClick={() => setCategoryFilter('practice')}
-                        className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                        className={`rounded-lg px-2 py-1.5 font-semibold transition-colors sm:px-2.5 sm:py-1 ${
                           categoryFilter === 'practice' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -711,7 +711,7 @@ function MainApp() {
                       </button>
                       <button
                         onClick={() => setCategoryFilter('free')}
-                        className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                        className={`rounded-lg px-2 py-1.5 font-semibold transition-colors sm:px-2.5 sm:py-1 ${
                           categoryFilter === 'free' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -719,7 +719,7 @@ function MainApp() {
                       </button>
                       <button
                         onClick={() => setCategoryFilter('paid')}
-                        className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                        className={`rounded-lg px-2 py-1.5 font-semibold transition-colors sm:px-2.5 sm:py-1 ${
                           categoryFilter === 'paid' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -729,7 +729,7 @@ function MainApp() {
                   </div>
 
                   {/* SQUARE SHAPED TOURNAMENT CARDS GRID (Matches user image specification) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                     {filteredTournaments.map((tour, index) => {
                       const isSelected = activeTournament?.id === tour.id;
                       const isFull = !tour.unlimitedTeams && tour.registeredCount >= tour.maxTeams;
@@ -750,7 +750,7 @@ function MainApp() {
                           onClick={() => {
                             setActiveTournament(tour);
                           }}
-                          className={`tournament-card relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4 shadow-xl ${
+                          className={`tournament-card relative aspect-[1.12/1] overflow-hidden rounded-2xl border p-4 shadow-xl transition-all cursor-pointer group flex flex-col justify-between sm:aspect-square sm:p-4 ${
                             isSelected
                               ? 'border-indigo-500 shadow-indigo-500/20 ring-2 ring-indigo-500/40 scale-[1.01]'
                               : 'border-[#25262f] hover:border-[#3a3b4a] bg-[#121520]'
