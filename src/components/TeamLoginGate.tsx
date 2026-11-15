@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, Gamepad2, KeyRound, ShieldCheck } from 'lucide-react';
 import { TeamProfile } from '../types/tournament';
-import { findRegisteredTeamProfile, getLocalTeamProfile, saveTeamProfile } from '../services/tournamentService';
+import { findRegisteredTeamProfile, getLocalTeamProfile, saveTeamProfile, verifyTeamWhatsAppForLogin } from '../services/tournamentService';
+import type { WhatsAppCountry } from '../utils/phone';
 
 interface Props {
   onLoginSuccess: (profile: TeamProfile) => void;
@@ -14,6 +15,8 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
   const existing = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(existing?.teamName || '');
   const [leaderName, setLeaderName] = useState(existing?.leaderName || '');
+  const [whatsappCountry, setWhatsappCountry] = useState<WhatsAppCountry>('BD');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
@@ -43,10 +46,19 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
         setError('Team not found. Check your details or register first.');
         return;
       }
-      await saveTeamProfile(profile);
-      onLoginSuccess(profile);
+      if (!profile.userId.startsWith('account_')) {
+        setError('This team has no saved WhatsApp login. Contact the organizer to link its account.');
+        return;
+      }
+      const verifiedWhatsAppNumber = await verifyTeamWhatsAppForLogin(profile.userId, profile.teamName, whatsappNumber, whatsappCountry);
+      const verifiedProfile = { ...profile, whatsappNumber: verifiedWhatsAppNumber };
+      await saveTeamProfile(verifiedProfile);
+      onLoginSuccess(verifiedProfile);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not connect. Try again.');
+      const code = typeof cause === 'object' && cause !== null && 'code' in cause ? String((cause as { code?: unknown }).code) : '';
+      setError(code === 'permission-denied'
+        ? 'Not matching your WhatsApp number.'
+        : cause instanceof Error ? cause.message : 'Could not connect. Try again.');
     } finally {
       setSaving(false);
     }
@@ -138,6 +150,16 @@ export const TeamLoginGate: React.FC<Props> = ({ onLoginSuccess, onOpenAdminSecr
                 className="w-full rounded-xl border border-white/10 bg-[#09090d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
               />
             </label>
+            <div className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold text-slate-300">Registered WhatsApp number</span>
+              <div className="flex gap-2">
+                <select aria-label="WhatsApp country code" value={whatsappCountry} onChange={(event) => setWhatsappCountry(event.target.value as WhatsAppCountry)} className="w-[48%] rounded-xl border border-white/10 bg-[#09090d] px-3 py-3 text-xs text-white outline-none focus:border-indigo-400/60 sm:w-52">
+                  <option value="BD">🇧🇩 Bangladesh (+880)</option>
+                  <option value="NP">🇳🇵 Nepal (+977)</option>
+                </select>
+                <input type="tel" required autoComplete="tel" inputMode="tel" maxLength={20} placeholder={whatsappCountry === 'BD' ? '01XXXXXXXXX' : '98XXXXXXXX'} value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#09090d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10" />
+              </div>
+            </div>
 
             <button
               type="submit"
