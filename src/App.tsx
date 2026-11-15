@@ -53,6 +53,39 @@ import { TeamAccountRegistrationModal } from './components/TeamAccountRegistrati
 import { PlayerSearchView } from './components/PlayerSearchView';
 import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { normalizeWhatsAppNumber } from './utils/phone';
+import type { WhatsAppCountry } from './utils/phone';
+
+function FirstLoginWhatsAppModal({ onSave }: { onSave: (number: string) => void }) {
+  const [country, setCountry] = useState<WhatsAppCountry>('BD');
+  const [number, setNumber] = useState('');
+  const [error, setError] = useState('');
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const normalized = normalizeWhatsAppNumber(number, country);
+    if (!normalized) {
+      setError(`Enter a valid ${country === 'BD' ? 'Bangladesh' : 'Nepal'} WhatsApp number.`);
+      return;
+    }
+    onSave(normalized);
+  };
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#03050a]/85 p-4 backdrop-blur-xl">
+      <form onSubmit={submit} className="w-full max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#10141f] p-6 text-white shadow-2xl">
+        <h2 className="text-lg font-extrabold">Add your WhatsApp number</h2>
+        <p className="text-xs leading-5 text-slate-400">We’ll save it to this device for your squad profile. Organizers can see it; it won’t appear publicly.</p>
+        <div className="flex gap-2">
+          <select aria-label="WhatsApp country" value={country} onChange={(event) => setCountry(event.target.value as WhatsAppCountry)} className="w-[48%] rounded-xl border border-white/10 bg-[#09090d] px-3 py-3 text-xs text-white">
+            <option value="BD">🇧🇩 Bangladesh (+880)</option><option value="NP">🇳🇵 Nepal (+977)</option>
+          </select>
+          <input autoFocus type="tel" inputMode="tel" autoComplete="tel" required maxLength={20} value={number} onChange={(event) => setNumber(event.target.value)} placeholder={country === 'BD' ? '01XXXXXXXXX' : '98XXXXXXXX'} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#09090d] px-3 py-3 text-sm text-white outline-none focus:border-indigo-400/60" />
+        </div>
+        {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
+        <button type="submit" className="w-full rounded-xl bg-gradient-to-r from-ember-600 to-amber-500 px-4 py-3 text-sm font-bold text-white">Save number</button>
+      </form>
+    </div>
+  );
+}
 
 const PUBLIC_READ_ONLY = import.meta.env.VITE_READ_ONLY_MODE === 'true';
 // The admin route is public to reach, but Firebase Auth + the protected admin
@@ -453,6 +486,11 @@ function MainApp() {
 
   return (
     <div className="app-shell relative isolate min-h-screen text-white font-sans flex flex-col md:flex-row antialiased select-none">
+      {!teamProfile.whatsappNumber && <FirstLoginWhatsAppModal onSave={(whatsappNumber) => {
+        const profile = { ...teamProfile, whatsappNumber, updatedAt: new Date().toISOString() };
+        void saveTeamProfile(profile);
+        setTeamProfile(profile);
+      }} />}
       {/* ================= CLEAN DESKTOP LEFT SIDEBAR ================= */}
       <aside
         className={`sidebar-shell fixed inset-y-0 left-0 z-40 w-64 border-r flex flex-col justify-between py-6 px-4 transform transition-transform duration-500 ease-[cubic-bezier(.22,1,.36,1)] md:translate-x-0 ${
