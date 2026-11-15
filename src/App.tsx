@@ -677,7 +677,7 @@ function MainApp() {
               {activeTab === 'tournaments' && <span aria-hidden="true" className="ml-auto h-px w-1/3 bg-gradient-to-l from-emerald-200/20 to-transparent sm:w-1/2" />}
             </div>
           </div>
-          <section aria-label="Follow our community" className="social-connect-panel mb-6 overflow-hidden rounded-2xl border border-white/[.08] bg-gradient-to-r from-[#15151d] via-[#12151d] to-[#101b1a] p-3 shadow-lg shadow-black/10 sm:mb-7 sm:p-4">
+          {activeTab === 'tournaments' && <section aria-label="Follow our community" className="social-connect-panel mb-6 overflow-hidden rounded-2xl border border-white/[.08] bg-gradient-to-r from-[#15151d] via-[#12151d] to-[#101b1a] p-3 shadow-lg shadow-black/10 sm:mb-7 sm:p-4">
             <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 px-1 sm:mb-3">
               <div><div className="text-[9px] font-black uppercase tracking-[.2em] text-cyan-200">Stay connected</div><h2 className="mt-0.5 text-sm font-extrabold text-white sm:text-base">Follow our community</h2></div>
               <span className="text-[9px] text-slate-500 sm:text-[10px]">News · events · tournament updates</span>
@@ -696,7 +696,7 @@ function MainApp() {
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white"><img src="/social/facebook-whatsapp-logo.jpg" alt="OG logo" className="h-full w-full object-contain"/></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-extrabold text-white sm:text-[11px]">WhatsApp Group</span><span className="block text-[8px] text-slate-500 sm:text-[9px]">Tournament updates</span></span><ExternalLink size={12} className="shrink-0 text-slate-600 transition group-hover:text-emerald-200"/>
               </a>
             </div>
-          </section>
+          </section>}
           {/* TAB 1: ALL TOURNAMENTS WITH SQUARE SHAPE CARDS (Matches Image Reference) */}
           {activeTab === 'tournaments' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
