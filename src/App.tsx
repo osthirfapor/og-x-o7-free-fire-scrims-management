@@ -28,6 +28,7 @@ import {
   CalendarDays,
   CheckCircle2,
   MessageCircle,
+  Phone,
   Infinity as InfinityIcon,
   Hash,
   Edit2,
@@ -91,6 +92,25 @@ function FirstLoginWhatsAppModal({ onSave }: { onSave: (number: string) => void 
         <button type="submit" className="w-full rounded-xl bg-gradient-to-r from-ember-600 to-amber-500 px-4 py-3 text-sm font-bold text-white">Save number</button>
       </form>
     </div>
+  );
+}
+
+function WhatsAppSupportButton() {
+  const message = 'Hi, I need support with the OG x o7 tournament website.';
+  const url = `https://wa.me/8801937679130?text=${encodeURIComponent(message)}`;
+  return (
+    <button
+      type="button"
+      aria-label="Contact WhatsApp support"
+      title="WhatsApp support"
+      onClick={() => openWhatsAppTab(url)}
+      className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-[#18a968] text-white shadow-[0_8px_28px_rgba(24,169,104,.42)] transition hover:scale-105 hover:bg-[#128c58] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#07080b] sm:bottom-6 sm:right-6 sm:h-14 sm:w-14"
+    >
+      <span className="relative flex h-8 w-8 items-center justify-center">
+        <MessageCircle size={30} strokeWidth={2.2} />
+        <span className="absolute inset-0 flex items-center justify-center pt-1"><Phone size={13} fill="currentColor" strokeWidth={2.4} /></span>
+      </span>
+    </button>
   );
 }
 
@@ -459,6 +479,7 @@ function MainApp() {
   if (!teamProfile) {
     return (
       <>
+        <WhatsAppSupportButton />
         <TeamLoginGate
           prefill={newAccountCredentials}
           onLoginSuccess={(profile) => {
@@ -527,6 +548,7 @@ function MainApp() {
 
   return (
     <div className="app-shell relative isolate min-h-screen text-white font-sans flex flex-col md:flex-row antialiased select-none">
+      <WhatsAppSupportButton />
       {!teamProfile.whatsappNumber && <FirstLoginWhatsAppModal onSave={(whatsappNumber) => {
         const profile = { ...teamProfile, whatsappNumber, updatedAt: new Date().toISOString() };
         void saveTeamProfile(profile);
