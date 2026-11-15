@@ -1503,6 +1503,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                               Leader: {log.leaderName} • Registered: {log.registeredCount} teams • Remaining:{' '}
                               {log.remainingSlots} slots
                             </div>
+                            {log.whatsappNumber && <div className="mt-1 text-gray-400">WhatsApp: <a className="text-emerald-300 hover:underline" href={`https://wa.me/${log.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{log.whatsappNumber}</a></div>}
                           </div>
                           <div className="text-right shrink-0">
                             <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${(log.discordStatus || (log.discordDelivered ? 'delivered' : 'failed')) === 'delivered' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (log.discordStatus === 'pending' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-rose-500/10 text-rose-300 border-rose-500/20')}`}>

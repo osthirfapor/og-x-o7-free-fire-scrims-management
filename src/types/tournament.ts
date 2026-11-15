@@ -46,6 +46,7 @@ export interface Team {
   teamName: string;
   teamLogo?: string;
   leaderName: string;
+  whatsappNumber?: string;
   players: Player[];
   playerNames: string[];
   status: 'approved' | 'pending' | 'rejected' | 'banned';
@@ -83,6 +84,7 @@ export interface RegistrationLog {
   registrationId: string;
   teamName: string;
   leaderName: string;
+  whatsappNumber?: string;
   playerCount: number;
   registeredCount: number;
   remainingSlots: number;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, Check, Gamepad2, LoaderCircle, Plus, ShieldCheck, UserRoundPlus, X } from 'lucide-react';
 import { Tournament, Team, Player } from '../types/tournament';
 import { registerTeam, getLocalTeamProfile } from '../services/tournamentService';
+import { normalizeBangladeshWhatsAppNumber } from '../utils/phone';
 
 interface Props {
   tournament: Tournament;
@@ -13,6 +14,7 @@ interface Props {
 export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose, walletBalance }) => {
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
   const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo));
   const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
@@ -78,6 +80,8 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
     setError(null);
     if (isUnavailable) { setError('Registration is currently closed.'); return; }
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
+    const normalizedWhatsAppNumber = normalizeBangladeshWhatsAppNumber(whatsappNumber);
+    if (!normalizedWhatsAppNumber) { setError('Enter a valid Bangladesh WhatsApp number, such as 01XXXXXXXXX.'); return; }
     if (!teamLogo.trim()) { setError('Upload your team logo.'); return; }
     if (!logoImageReady) { setError('Wait for the team logo preview to load.'); return; }
     const starters = players.slice(0, 4);
@@ -92,6 +96,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
       const { team } = await registerTeam({
         tournament,
         teamName: teamName.trim(),
+        whatsappNumber: normalizedWhatsAppNumber,
         teamLogo,
         leaderName: starters[0].name.trim(),
         players: submittedPlayers,
@@ -149,6 +154,17 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
               disabled={isUnavailable}
               className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="registration-whatsapp" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">WhatsApp number <span className="text-rose-300">· required</span></label>
+            <input
+              id="registration-whatsapp" type="tel" autoComplete="tel" inputMode="tel" required maxLength={20}
+              value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)}
+              placeholder="01XXXXXXXXX" disabled={isUnavailable}
+              className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+            />
+            <p className="text-[10px] text-slate-500">Bangladesh number; it will be shown publicly in Registered Teams.</p>
           </div>
 
           <div className="space-y-2.5">

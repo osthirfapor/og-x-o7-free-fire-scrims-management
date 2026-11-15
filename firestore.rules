@@ -93,6 +93,8 @@ service cloud.firestore {
           && request.resource.data.teamLogo is string
           && request.resource.data.teamLogo.size() > 0
           && request.resource.data.registrationId is string
+          && request.resource.data.whatsappNumber is string
+          && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$')
           && request.resource.data.players is list
           && request.resource.data.players.size() >= 4
           && request.resource.data.players.size() <= 5

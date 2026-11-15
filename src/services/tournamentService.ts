@@ -15,6 +15,7 @@ import {
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sendDiscordEvent } from '../lib/discordEvents';
 import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
+import { normalizeBangladeshWhatsAppNumber } from '../utils/phone';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
 export function generateRegistrationId(): string {
@@ -205,14 +206,16 @@ export function subscribeTeams(
 export async function registerTeam(params: {
   tournament: Tournament;
   teamName: string;
+  whatsappNumber: string;
   teamLogo: string;
   leaderName: string;
   players: Player[]; // 4 main + optional backup
 }): Promise<{ team: Team; registrationId: string }> {
-  const { tournament, teamName, teamLogo, leaderName, players } = params;
+  const { tournament, teamName, whatsappNumber, teamLogo, leaderName, players } = params;
 
   // Basic validation
   if (!teamName.trim()) throw new Error('Enter a team name.');
+  if (!normalizeBangladeshWhatsAppNumber(whatsappNumber)) throw new Error('Enter a valid Bangladesh WhatsApp number.');
   if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registering. Contact the organizer.');
   if (!teamLogo?.trim()) throw new Error('Upload a team logo image.');
   const isUploadedLogo = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(teamLogo);
@@ -321,6 +324,7 @@ export async function registerTeam(params: {
       teamName: teamName.trim(),
       teamLogo: teamLogo?.trim() || '',
       leaderName: leaderName.trim(),
+      whatsappNumber: normalizeBangladeshWhatsAppNumber(whatsappNumber)!,
       players: players.map((p) => ({
         name: p.name.trim(),
         role: p.role,
@@ -398,6 +402,7 @@ export async function registerTeam(params: {
       registrationId,
       teamName: resultTeam.newTeam.teamName,
       leaderName: resultTeam.newTeam.leaderName,
+      whatsappNumber,
       playerCount: cleanPlayerNames.length,
       registeredCount: resultTeam.nextCount,
       remainingSlots: resultTeam.remainingSlots,
