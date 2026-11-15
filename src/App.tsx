@@ -670,7 +670,7 @@ function MainApp() {
             </div>
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
-              {loadingTournaments ? 'Connecting to Firebase' : `${tournaments.length} tournaments live`}
+              {loadingTournaments ? 'Connecting to Firebase' : `${filteredTournaments.length} tournaments live`}
             </div>
           </div>
           {/* TAB 1: ALL TOURNAMENTS WITH SQUARE SHAPE CARDS (Matches Image Reference) */}
