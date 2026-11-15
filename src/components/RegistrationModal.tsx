@@ -39,7 +39,7 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isUnavailable = tournament.status !== 'open' || tournament.registeredCount >= tournament.maxTeams;
+  const isUnavailable = tournament.status !== 'open' || (!tournament.unlimitedTeams && tournament.registeredCount >= tournament.maxTeams);
   const updatePlayer = (index: number, name: string) => setPlayers((current) => current.map((player, i) => i === index ? { ...player, name } : player));
 
   const handleLogoUpload = async (file?: File) => {

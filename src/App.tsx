@@ -99,6 +99,17 @@ const CARD_BACKGROUNDS: Record<string, string> = {
   paid: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80',
 };
 
+function tournamentGroupLabel(index: number): string {
+  let value = index + 1;
+  let label = '';
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+  return `GROUP-${label}`;
+}
+
 function MainApp() {
   const { isAdmin } = useAuth();
 
@@ -206,7 +217,7 @@ function MainApp() {
     setActiveTournament(requestedTournament);
     // A direct link should land new visitors at login. A logged-in squad can
     // continue straight into tournament registration.
-    setShowRegModal(Boolean(teamProfile) && requestedTournament.status === 'open' && requestedTournament.registeredCount < requestedTournament.maxTeams);
+    setShowRegModal(Boolean(teamProfile) && requestedTournament.status === 'open' && (requestedTournament.unlimitedTeams || requestedTournament.registeredCount < requestedTournament.maxTeams));
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('register');
     window.history.replaceState({}, '', cleanUrl.toString());
@@ -214,7 +225,7 @@ function MainApp() {
 
   const handleOpenRegistration = (tour?: Tournament) => {
     const target = tour || activeTournament;
-    if (!target || target.status !== 'open' || target.registeredCount >= target.maxTeams) return;
+    if (!target || target.status !== 'open' || (!target.unlimitedTeams && target.registeredCount >= target.maxTeams)) return;
     if (myRegistrations.some((registration) => registration.tournament.id === target.id)) return;
     const fee = target.category === 'paid' ? Number(target.entryFeeAmount ?? target.entryFee ?? 0) : 0;
     if (fee > walletBalance) {
@@ -315,7 +326,7 @@ function MainApp() {
   // Filter tournaments by category
   const filteredTournaments = useMemo(() => {
     return tournaments.filter((t) => {
-      const hasAvailableSlots = t.registeredCount < t.maxTeams;
+      const hasAvailableSlots = t.unlimitedTeams || t.registeredCount < t.maxTeams;
       return t.status !== 'completed' && hasAvailableSlots && (categoryFilter === 'all' || (t.category || 'practice') === categoryFilter);
     });
   }, [tournaments, categoryFilter]);
@@ -347,12 +358,20 @@ function MainApp() {
   };
   const myRegistrations = useMemo(() => {
     if (!teamProfile) return [];
-    return allTeams
+    const registrations = allTeams
       .filter((team) => team.teamName.trim().toLocaleLowerCase() === teamProfile.teamName.trim().toLocaleLowerCase()
         && team.leaderName.trim().toLocaleLowerCase() === teamProfile.leaderName.trim().toLocaleLowerCase())
       .map((team) => ({ team, tournament: tournaments.find((tournament) => tournament.id === team.tournamentId) }))
       .filter((item): item is { team: Team; tournament: Tournament } => Boolean(item.tournament))
       .sort((a, b) => new Date(b.team.createdAt).getTime() - new Date(a.team.createdAt).getTime());
+    return registrations.map((entry) => {
+      if (!entry.tournament.groupsEnabled || !entry.tournament.teamsPerGroup) return { ...entry, groupName: undefined };
+      const earlierTeams = allTeams
+        .filter((team) => team.tournamentId === entry.tournament.id)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id));
+      const position = Math.max(0, earlierTeams.findIndex((team) => team.id === entry.team.id));
+      return { ...entry, groupName: tournamentGroupLabel(Math.floor(position / entry.tournament.teamsPerGroup!)) };
+    });
   }, [allTeams, teamProfile?.teamName, teamProfile?.leaderName, tournaments]);
   const myStanding = useMemo(() => {
     if (!teamProfile) return null;
@@ -709,12 +728,12 @@ function MainApp() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4">
                     {filteredTournaments.map((tour, index) => {
                       const isSelected = activeTournament?.id === tour.id;
-                      const isFull = tour.registeredCount >= tour.maxTeams;
+                      const isFull = !tour.unlimitedTeams && tour.registeredCount >= tour.maxTeams;
                       const isOpen = tour.status === 'open';
                       const isRegistered = myRegistrations.some((registration) => registration.tournament.id === tour.id);
                       const entryFee = tour.category === 'paid' ? Number(tour.entryFeeAmount ?? tour.entryFee ?? 0) : 0;
-                      const remainingSlots = Math.max(0, tour.maxTeams - tour.registeredCount);
-                      const filledPercent = tour.maxTeams > 0 ? Math.min(100, (tour.registeredCount / tour.maxTeams) * 100) : 0;
+                      const remainingSlots = tour.unlimitedTeams ? null : Math.max(0, tour.maxTeams - tour.registeredCount);
+                      const filledPercent = !tour.unlimitedTeams && tour.maxTeams > 0 ? Math.min(100, (tour.registeredCount / tour.maxTeams) * 100) : 0;
 
                       // Background artwork selection
                       const bgImg =
@@ -810,8 +829,8 @@ function MainApp() {
                               )}
                             </div>
                             <div className="mt-2 space-y-1.5 text-[9px] sm:text-[10px]">
-                              <div className="flex items-center justify-between gap-2 font-semibold"><span className="text-slate-300">{tour.registeredCount}/{tour.maxTeams} teams</span><span className={remainingSlots ? 'text-emerald-300' : 'text-rose-300'}>{remainingSlots} {remainingSlots === 1 ? 'slot' : 'slots'} left</span></div>
-                              <div role="progressbar" aria-label={`${tour.name} registration slots`} aria-valuemin={0} aria-valuemax={tour.maxTeams} aria-valuenow={tour.registeredCount} className="h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/50"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-indigo-400 transition-[width] duration-700 ease-out" style={{ width: `${filledPercent}%` }} /></div>
+                              <div className="flex items-center justify-between gap-2 font-semibold"><span className="text-slate-300">{tour.registeredCount}/{tour.unlimitedTeams ? '∞' : tour.maxTeams} teams</span>{remainingSlots !== null && <span className={remainingSlots ? 'text-emerald-300' : 'text-rose-300'}>{remainingSlots} {remainingSlots === 1 ? 'slot' : 'slots'} left</span>}</div>
+                              {!tour.unlimitedTeams && <div role="progressbar" aria-label={`${tour.name} registration slots`} aria-valuemin={0} aria-valuemax={tour.maxTeams} aria-valuenow={tour.registeredCount} className="h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/50"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-indigo-400 transition-[width] duration-700 ease-out" style={{ width: `${filledPercent}%` }} /></div>}
                             </div>
                           </div>
                         </div>
@@ -914,7 +933,7 @@ function MainApp() {
             <section className="space-y-4">
               <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
               {myRegistrations.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><CalendarDays size={26} className="mx-auto text-slate-600" /><h3 className="mt-3 text-sm font-bold text-white">No registrations yet</h3><p className="mt-1 text-xs text-slate-500">When your squad registers, tournaments will appear here.</p><button type="button" onClick={() => setActiveTab('tournaments')} className="mt-4 rounded-xl bg-indigo-500/15 px-4 py-2 text-xs font-bold text-indigo-200">Explore open tournaments</button></div> : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament, groupName }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div>{groupName && <div className="mt-2 inline-flex rounded-lg border border-violet-300/20 bg-violet-300/[.08] px-2.5 py-1.5 text-xs font-extrabold text-violet-200">Your squad is in {groupName}</div>}</button>)}</div>
               )}
             </section>
           )}

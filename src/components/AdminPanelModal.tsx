@@ -71,12 +71,7 @@ interface Props {
   standalone?: boolean;
 }
 
-const MAP_OPTIONS = ['Purgatory', 'Alpine', 'NexTerra'];
-const DEFAULT_MAP = MAP_OPTIONS[0];
-const cleanMapSelection = (value?: string) => {
-  const valid = (value || '').split(',').map((item) => item.trim()).filter((item) => MAP_OPTIONS.includes(item));
-  return valid.length ? valid.join(', ') : DEFAULT_MAP;
-};
+const DEFAULT_GROUP_SIZE = 12;
 
 async function processTournamentImage(file: File): Promise<string> {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPG, or WebP image.');
@@ -137,7 +132,10 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourMaxTeams, setTourMaxTeams] = useState(currentTour.maxTeams);
   const [tourEntryFee, setTourEntryFee] = useState(currentTour.entryFee || '');
   const [tourStatus, setTourStatus] = useState(currentTour.status);
-  const [tourMap, setTourMap] = useState(cleanMapSelection(currentTour.map));
+  const [tourGroupsEnabled, setTourGroupsEnabled] = useState(currentTour.groupsEnabled === true);
+  const [tourUnlimitedTeams, setTourUnlimitedTeams] = useState(currentTour.unlimitedTeams === true);
+  const [tourTeamsPerGroup, setTourTeamsPerGroup] = useState(currentTour.teamsPerGroup || DEFAULT_GROUP_SIZE);
+  const [tourGroupCount, setTourGroupCount] = useState(currentTour.groupCount || 1);
   const [tourCardImage, setTourCardImage] = useState(currentTour.cardImageUrl || '');
   const [tourCardImageName, setTourCardImageName] = useState('');
   const [tourImageUploading, setTourImageUploading] = useState(false);
@@ -160,7 +158,10 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourDate, setNewTourDate] = useState('');
   const [newTourTime, setNewTourTime] = useState('18:00 UTC');
   const [newTourMax, setNewTourMax] = useState(12);
-  const [newTourMap, setNewTourMap] = useState<string[]>([DEFAULT_MAP]);
+  const [newTourGroupsEnabled, setNewTourGroupsEnabled] = useState(false);
+  const [newTourUnlimitedTeams, setNewTourUnlimitedTeams] = useState(false);
+  const [newTourTeamsPerGroup, setNewTourTeamsPerGroup] = useState(DEFAULT_GROUP_SIZE);
+  const [newTourGroupCount, setNewTourGroupCount] = useState(1);
   const [newTourCategory, setNewTourCategory] = useState<'practice' | 'free' | 'paid'>('practice');
   const [newTourEntryFee, setNewTourEntryFee] = useState('');
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
@@ -236,7 +237,10 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourMaxTeams(activeTournament.maxTeams);
     setTourEntryFee(activeTournament.entryFee || '');
     setTourStatus(activeTournament.status);
-    setTourMap(cleanMapSelection(activeTournament.map));
+    setTourGroupsEnabled(activeTournament.groupsEnabled === true);
+    setTourUnlimitedTeams(activeTournament.unlimitedTeams === true);
+    setTourTeamsPerGroup(activeTournament.teamsPerGroup || DEFAULT_GROUP_SIZE);
+    setTourGroupCount(activeTournament.groupCount || 1);
     setTourCardImage(activeTournament.cardImageUrl || '');
     setRedirectLink(activeTournament.redirectLink || '');
     setRedirectEnabled(activeTournament.redirectLinkEnabled ?? true);
@@ -323,7 +327,10 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourMaxTeams(tour.maxTeams);
     setTourEntryFee(tour.entryFee || '');
     setTourStatus(tour.status);
-    setTourMap(cleanMapSelection(tour.map));
+    setTourGroupsEnabled(tour.groupsEnabled === true);
+    setTourUnlimitedTeams(tour.unlimitedTeams === true);
+    setTourTeamsPerGroup(tour.teamsPerGroup || DEFAULT_GROUP_SIZE);
+    setTourGroupCount(tour.groupCount || 1);
     setTourCardImage(tour.cardImageUrl || '');
     setRedirectLink(tour.redirectLink || '');
     setRedirectEnabled(tour.redirectLinkEnabled ?? true);
@@ -411,15 +418,23 @@ export const AdminPanelModal: React.FC<Props> = ({
   const handleSaveTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const updatedCapacity = tourUnlimitedTeams ? 2147483647 : tourGroupsEnabled ? tourGroupCount * tourTeamsPerGroup : Number(tourMaxTeams);
+      if (!Number.isSafeInteger(updatedCapacity) || updatedCapacity < 1 || (!tourUnlimitedTeams && updatedCapacity < currentTour.registeredCount)) {
+        alert(`Capacity must be at least the ${currentTour.registeredCount} teams already registered.`);
+        return;
+      }
       await updateTournament(currentTour.id, {
         name: tourName,
         date: tourDate,
         time: tourTime,
-        maxTeams: Number(tourMaxTeams),
+        maxTeams: updatedCapacity,
+        groupsEnabled: tourGroupsEnabled,
+        unlimitedTeams: tourUnlimitedTeams,
+        teamsPerGroup: tourGroupsEnabled ? tourTeamsPerGroup : 0,
+        groupCount: tourGroupsEnabled ? tourGroupCount : 0,
         entryFee: currentTour.category === 'paid' ? tourEntryFee.trim() : '',
         entryFeeAmount: currentTour.category === 'paid' ? Number(tourEntryFee) || 0 : 0,
-        status: tourStatus,
-        map: tourMap,
+        status: !tourUnlimitedTeams && updatedCapacity <= currentTour.registeredCount && tourStatus === 'open' ? 'closed' : tourStatus,
         cardImageUrl: tourCardImage.trim(),
       });
       recordAdminActivity('tournament_updated', `Updated tournament settings for ${tourName}.`);
@@ -476,8 +491,11 @@ export const AdminPanelModal: React.FC<Props> = ({
         entryFeeAmount: newTourCategory === 'paid' ? Number(newTourEntryFee) || 0 : 0,
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
-        maxTeams: Number(newTourMax) || 12,
-        map: newTourMap.join(', ') || DEFAULT_MAP,
+        maxTeams: newTourGroupsEnabled ? newTourGroupCount * newTourTeamsPerGroup : Number(newTourMax) || 12,
+        groupsEnabled: newTourGroupsEnabled,
+        unlimitedTeams: newTourUnlimitedTeams,
+        teamsPerGroup: newTourGroupsEnabled ? newTourTeamsPerGroup : 0,
+        groupCount: newTourGroupsEnabled ? newTourGroupCount : 0,
         redirectLink: newTourGroupLink.trim(),
         redirectLinkEnabled: Boolean(newTourGroupLink.trim()),
         redirectButtonText: 'Join Official Discord Lounge',
@@ -492,7 +510,10 @@ export const AdminPanelModal: React.FC<Props> = ({
       setNewTourGroupLink('');
       setNewTourCardImage('');
       setNewTourCardImageName('');
-      setNewTourMap([DEFAULT_MAP]);
+      setNewTourGroupsEnabled(false);
+      setNewTourUnlimitedTeams(false);
+      setNewTourTeamsPerGroup(DEFAULT_GROUP_SIZE);
+      setNewTourGroupCount(1);
       alert('New tournament scrim successfully created!');
     } catch (err: any) {
       alert(`Failed to create tournament: ${err.message}`);
@@ -661,7 +682,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const activeTournamentIds = new Set(activeScrims.map((tournament) => tournament.id));
   const activeScrimTeams = allRegisteredTeams.filter((team) => activeTournamentIds.has(team.tournamentId) && team.status === 'approved');
   const liveRegisteredTeamCount = activeScrims.reduce((count, tournament) => count + Math.max(0, Number(tournament.registeredCount) || 0), 0);
-  const liveRemainingSlotCount = activeScrims.reduce((count, tournament) => count + Math.max(0, tournament.maxTeams - tournament.registeredCount), 0);
+  const liveRemainingSlotCount = activeScrims.reduce((count, tournament) => count + (tournament.unlimitedTeams ? 0 : Math.max(0, tournament.maxTeams - tournament.registeredCount)), 0);
   const livePlayerCount = activeScrimTeams.reduce((count, team) => count + (team.players?.length || 0), 0);
   const completedScrims = tournaments.filter((tournament) => tournament.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   const visibleWallets = teamWallets.filter((wallet) => wallet.teamName.toLocaleLowerCase().includes(walletSearch.toLocaleLowerCase().trim()));
@@ -867,7 +888,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <div className="space-y-2.5">
                       {activeScrims.map((tour) => {
                         const selected = tour.id === currentTour.id;
-                        const full = tour.registeredCount >= tour.maxTeams;
+                        const full = !tour.unlimitedTeams && tour.registeredCount >= tour.maxTeams;
                         return (
                           <article key={tour.id} onDoubleClick={() => openTournamentTeams(tour)} title="Double-click to view registered teams" className={`cursor-pointer rounded-2xl border p-4 transition-all ${selected ? 'border-orange-300/35 bg-orange-300/[.045] shadow-lg shadow-orange-950/10' : 'border-[#282934] bg-[#15161d] hover:border-white/15'}`}>
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -878,7 +899,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
                                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                                  <span>{tour.date} · {tour.time}</span><span>{tour.registeredCount}/{tour.maxTeams} teams</span>
+                                  <span>{tour.date} · {tour.time}</span><span>{tour.registeredCount}/{tour.unlimitedTeams ? '∞' : tour.maxTeams} teams{tour.groupsEnabled ? ` · ${tour.groupCount} groups × ${tour.teamsPerGroup}` : ''}</span>
                                   {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
                                 </div>
                               </div>
@@ -1046,7 +1067,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                               {t.status}
                             </span>
                             <span className="font-bold text-white">
-                              {t.registeredCount} / {t.maxTeams} Teams
+                              {t.registeredCount} / {t.unlimitedTeams ? 'Unlimited' : t.maxTeams} Teams
                             </span>
                             <div className="relative" onDoubleClick={(event) => event.stopPropagation()}><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { openTournamentTeams(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
                           </div>
@@ -1080,7 +1101,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </div>
                       <button
                         type="button"
-                        disabled={!currentTour.id || currentTour.status !== 'open' || currentTour.registeredCount >= currentTour.maxTeams}
+                        disabled={!currentTour.id || currentTour.status !== 'open' || (!currentTour.unlimitedTeams && currentTour.registeredCount >= currentTour.maxTeams)}
                         onClick={() => setShowAdminRegistration(true)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -1423,40 +1444,12 @@ export const AdminPanelModal: React.FC<Props> = ({
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">
-                        Max Teams (Capacity)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="48"
-                        value={tourMaxTeams}
-                        onChange={(e) => setTourMaxTeams(Number(e.target.value))}
-                        className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
-                      />
+                      {tourGroupsEnabled ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Group Capacity</label><div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3.5 py-2 text-sm font-mono text-cyan-100">{tourGroupCount * tourTeamsPerGroup} teams total</div></> : tourUnlimitedTeams ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Capacity</label><div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[.04] px-3.5 py-2 text-sm text-emerald-100">Unlimited teams</div></> : <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Max Teams (Capacity)</label><input type="number" min="1" max="10000" value={tourMaxTeams} onChange={(e) => setTourMaxTeams(Math.max(1, Number(e.target.value) || 1))} className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"/>}
                     </div>
 
-                    <div className="col-span-3">
-                      <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Maps</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {MAP_OPTIONS.map((map) => {
-                          const selected = tourMap.split(',').map((value) => value.trim()).includes(map);
-                          return (
-                            <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${selected ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2a2b36] bg-[#0b0c10] text-gray-400 hover:text-white'}`}>
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => {
-                                  const maps = tourMap.split(',').map((value) => value.trim()).filter(Boolean);
-                                  setTourMap((selected ? maps.filter((value) => value !== map) : [...maps, map]).join(', '));
-                                }}
-                                className="accent-indigo-500"
-                              />
-                              {map}
-                            </label>
-                          );
-                        })}
-                      </div>
+                    <div className="col-span-3 rounded-xl border border-white/[.08] bg-white/[.025] p-3">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={tourGroupsEnabled} onChange={(event) => { setTourGroupsEnabled(event.target.checked); if (event.target.checked) setTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
+                      {tourGroupsEnabled ? <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={tourGroupCount} onChange={(event) => setTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={tourTeamsPerGroup} onChange={(event) => setTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Capacity: {tourGroupCount * tourTeamsPerGroup} teams · registrations close automatically when full.</p></div> : <><label className="mt-2 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={tourUnlimitedTeams} onChange={(event) => setTourUnlimitedTeams(event.target.checked)} className="accent-emerald-500"/> Unlimited teams (registration closes manually)</label><p className="mt-1 text-[10px] text-gray-500">Group assignment is off unless selected above.</p></>}
                     </div>
 
                     <div>
@@ -1729,34 +1722,9 @@ export const AdminPanelModal: React.FC<Props> = ({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Max Teams</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="48"
-                      value={newTourMax}
-                      onChange={(e) => setNewTourMax(Number(e.target.value))}
-                      className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs text-gray-400 mb-2">Select Maps</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {MAP_OPTIONS.map((map) => (
-                        <label key={map} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${newTourMap.includes(map) ? 'border-indigo-500/50 bg-indigo-500/10 text-white' : 'border-[#2a2b36] bg-[#0b0c10] text-gray-400 hover:text-white'}`}>
-                          <input
-                            type="checkbox"
-                            checked={newTourMap.includes(map)}
-                            onChange={() => setNewTourMap((maps) => maps.includes(map) ? maps.filter((value) => value !== map) : [...maps, map])}
-                            className="accent-indigo-500"
-                          />
-                          {map}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                <div className="rounded-xl border border-white/[.08] bg-white/[.025] p-3">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={newTourGroupsEnabled} onChange={(event) => { setNewTourGroupsEnabled(event.target.checked); if (event.target.checked) setNewTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
+                  {newTourGroupsEnabled ? <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={newTourGroupCount} onChange={(event) => setNewTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={newTourTeamsPerGroup} onChange={(event) => setNewTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Total capacity: {newTourGroupCount * newTourTeamsPerGroup} teams; registration closes when all groups fill.</p></div> : <><label className="mt-3 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={newTourUnlimitedTeams} onChange={(event) => setNewTourUnlimitedTeams(event.target.checked)} className="accent-emerald-500"/> Unlimited teams (registration closes manually)</label>{!newTourUnlimitedTeams && <label className="mt-2 block text-xs text-gray-400">Max Teams<input type="number" min="1" max="10000" value={newTourMax} onChange={(event) => setNewTourMax(Math.max(1, Number(event.target.value) || 1))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label>}</>}
                 </div>
 
                 <div>

@@ -69,6 +69,10 @@ export interface Tournament {
   redirectLinkEnabled: boolean;
   redirectButtonText: string;
   map?: string;
+  groupsEnabled?: boolean;
+  teamsPerGroup?: number;
+  groupCount?: number;
+  unlimitedTeams?: boolean;
   entryFee?: string;
   entryFeeAmount?: number;
   prizePool?: string;

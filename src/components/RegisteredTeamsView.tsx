@@ -47,7 +47,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
     setExpandedTeamId((prev) => (prev === teamId ? null : teamId));
   };
 
-  const remainingSlots = Math.max(0, tournament.maxTeams - tournament.registeredCount);
+  const remainingSlots = tournament.unlimitedTeams ? null : Math.max(0, tournament.maxTeams - tournament.registeredCount);
 
   return (
     <div className="space-y-5">
@@ -63,7 +63,7 @@ export const RegisteredTeamsView: React.FC<Props> = ({
             {tournament.name}
           </h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            Schedule: <span className="text-gray-200 font-medium">{tournament.date} at {tournament.time}</span> • Capacity: {tournament.maxTeams} Teams
+            Schedule: <span className="text-gray-200 font-medium">{tournament.date} at {tournament.time}</span> • Capacity: {tournament.unlimitedTeams ? 'Unlimited' : `${tournament.maxTeams} Teams`}
           </p>
         </div>
 
@@ -71,16 +71,16 @@ export const RegisteredTeamsView: React.FC<Props> = ({
           <div className="bg-[#0d0e13] px-3.5 py-2 rounded-xl border border-[#282934] text-center">
             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Registered Teams</div>
             <div className="text-lg font-bold text-white">
-              <span className="text-indigo-400">{teams.length}</span> / {tournament.maxTeams}
+              <span className="text-indigo-400">{teams.length}</span> / {tournament.unlimitedTeams ? '∞' : tournament.maxTeams}
             </div>
           </div>
 
-          {tournament.status === 'open' && remainingSlots > 0 && onRegisterClick && (
+          {tournament.status === 'open' && (remainingSlots === null || remainingSlots > 0) && onRegisterClick && (
             <button
               onClick={onRegisterClick}
               className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition-all"
             >
-              + Register Team ({remainingSlots} Slots Left)
+              + Register Team ({remainingSlots === null ? 'Unlimited slots' : `${remainingSlots} Slots Left`})
             </button>
           )}
         </div>

@@ -342,7 +342,7 @@ export async function registerTeam(params: {
       throw new Error('Registration is closed.');
     }
 
-    if (tourData.registeredCount >= tourData.maxTeams) {
+    if (!tourData.unlimitedTeams && tourData.registeredCount >= tourData.maxTeams) {
       throw new Error('All team slots are full.');
     }
 
@@ -391,7 +391,7 @@ export async function registerTeam(params: {
     };
 
     const nextCount = (tourData.registeredCount || 0) + 1;
-    const shouldClose = nextCount >= tourData.maxTeams;
+    const shouldClose = !tourData.unlimitedTeams && nextCount >= tourData.maxTeams;
 
     // 1. Write team document
     transaction.set(teamRef, newTeamData);
@@ -417,7 +417,7 @@ export async function registerTeam(params: {
       newTeam: newTeamData,
       nextCount,
       maxTeams: tourData.maxTeams,
-      remainingSlots: Math.max(0, tourData.maxTeams - nextCount),
+      remainingSlots: tourData.unlimitedTeams ? -1 : Math.max(0, tourData.maxTeams - nextCount),
       paidTournament,
       requiredFee,
       walletBalanceAfter: paidTournament && walletData ? Math.round((walletData.balance - requiredFee) * 100) / 100 : null,
@@ -430,8 +430,8 @@ export async function registerTeam(params: {
     'Team name': resultTeam.newTeam.teamName,
     'Captain IGN': resultTeam.newTeam.leaderName,
     'Players': cleanPlayerNames.join(' · '),
-    'Slots': `${resultTeam.nextCount}/${resultTeam.maxTeams}`,
-    'Remaining slots': resultTeam.remainingSlots,
+    'Slots': `${resultTeam.nextCount}/${resultTeam.remainingSlots === -1 ? 'Unlimited' : resultTeam.maxTeams}`,
+    'Remaining slots': resultTeam.remainingSlots === -1 ? 'Unlimited' : resultTeam.remainingSlots,
     ...(resultTeam.paidTournament ? { 'Entry fee': `৳${resultTeam.requiredFee}` } : {}),
   });
   const discordStatus: 'delivered' | 'pending' | 'failed' = discordDelivered ? 'delivered' : 'failed';
@@ -482,13 +482,17 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     category: data.category || 'practice',
     date: data.date || new Date().toISOString().split('T')[0],
     time: data.time || '18:00 UTC',
-    maxTeams: Number(data.maxTeams) || 12,
+    maxTeams: data.unlimitedTeams ? 2147483647 : Number(data.groupsEnabled ? Number(data.groupCount || 1) * Number(data.teamsPerGroup || 12) : data.maxTeams) || 12,
     registeredCount: 0,
     status: 'open',
     redirectLink: data.redirectLink ?? '',
     redirectLinkEnabled: data.redirectLinkEnabled ?? true,
     redirectButtonText: data.redirectButtonText || 'Join WhatsApp / Discord Group',
     map: data.map || 'Purgatory',
+    groupsEnabled: data.groupsEnabled === true,
+    teamsPerGroup: data.groupsEnabled ? Math.max(1, Number(data.teamsPerGroup) || 12) : undefined,
+    groupCount: data.groupsEnabled ? Math.max(1, Number(data.groupCount) || 1) : undefined,
+    unlimitedTeams: data.unlimitedTeams === true,
     entryFee: data.entryFee || '',
     entryFeeAmount: Number(data.entryFeeAmount ?? data.entryFee ?? 0) || 0,
     prizePool: data.prizePool || '',
@@ -585,7 +589,7 @@ export async function deleteTeam(tournamentId: string, teamId: string) {
         const newCount = Math.max(0, (tour.registeredCount || 0) - 1);
         tx.update(tournamentRef, {
           registeredCount: newCount,
-          status: tour.status === 'closed' && newCount < tour.maxTeams ? 'open' : tour.status,
+          status: tour.status === 'closed' && !tour.unlimitedTeams && newCount < tour.maxTeams ? 'open' : tour.status,
           updatedAt: now,
         });
       }
@@ -641,7 +645,7 @@ export async function deleteRegisteredTeamEverywhere(teamNameInput: string): Pro
           const registeredCount = Math.max(0, (data.registeredCount || 0) - existingRefs.length);
           transaction.update(tournamentRef, {
             registeredCount,
-            status: data.status === 'closed' && registeredCount < data.maxTeams ? 'open' : data.status,
+            status: data.status === 'closed' && !data.unlimitedTeams && registeredCount < data.maxTeams ? 'open' : data.status,
             updatedAt: new Date().toISOString(),
           });
         }
