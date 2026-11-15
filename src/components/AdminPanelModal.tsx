@@ -72,6 +72,12 @@ interface Props {
 }
 
 const DEFAULT_GROUP_SIZE = 12;
+const STANDINGS_COLOR_THEMES = {
+  lime: { label: 'Lime green', accent: '#d9f75e', soft: '#e5f990', row: '#0a5734', text: '#082c1b' },
+  cyan: { label: 'Ocean cyan', accent: '#67e8f9', soft: '#a5f3fc', row: '#07536b', text: '#082c1b' },
+  orange: { label: 'Fire orange', accent: '#fb923c', soft: '#fdba74', row: '#713b16', text: '#2c1608' },
+  violet: { label: 'Royal violet', accent: '#c4b5fd', soft: '#ddd6fe', row: '#48347b', text: '#21133d' },
+} as const;
 
 function resultGroupLabel(index: number): string {
   let value = index + 1;
@@ -250,6 +256,10 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [previewTournamentId, setPreviewTournamentId] = useState(activeTournament.id);
   const [previewGroup, setPreviewGroup] = useState('all');
   const [previewMapNumber, setPreviewMapNumber] = useState(1);
+  const [previewTableTheme, setPreviewTableTheme] = useState<keyof typeof STANDINGS_COLOR_THEMES>(() => {
+    const savedTheme = localStorage.getItem('ogxo7_standings_table_theme');
+    return savedTheme && savedTheme in STANDINGS_COLOR_THEMES ? savedTheme as keyof typeof STANDINGS_COLOR_THEMES : 'lime';
+  });
 
   // Sync when activeTournament changes
   useEffect(() => {
@@ -273,6 +283,10 @@ export const AdminPanelModal: React.FC<Props> = ({
     setRedirectEnabled(activeTournament.redirectLinkEnabled ?? true);
     setRedirectBtnText(activeTournament.redirectButtonText || 'Join Scrims Group');
   }, [activeTournament]);
+
+  useEffect(() => {
+    localStorage.setItem('ogxo7_standings_table_theme', previewTableTheme);
+  }, [previewTableTheme]);
 
   // Load privileged data only after Firebase confirms this user is an admin.
   useEffect(() => {
@@ -748,6 +762,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const previewGroupOptions = previewGroupsEnabled ? Array.from({ length: previewGroupCount }, (_, index) => resultGroupLabel(index)) : [];
   const previewTournamentResults = results.filter((result) => result.tournamentId === previewTournament.id);
   const previewMapOptions = Array.from(new Set([...previewTournamentResults.map((result) => result.mapNumber || 1), previewMapNumber])).sort((a, b) => a - b);
+  const standingsTheme = STANDINGS_COLOR_THEMES[previewTableTheme];
   const previewRows = previewRegisteredTeams
     .filter((team) => previewGroup === 'all' || previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) === previewGroup)
     .map((team) => ({
@@ -1516,7 +1531,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <button type="button" onClick={() => setShowStandingsPreview(false)} aria-label="Close preview" className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={18} /></button>
                     </div>
                     <div className="relative min-h-0 flex-1 overflow-auto p-3 sm:p-6">
-                      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Tournament
                           <select value={previewTournament.id} onChange={(event) => { setPreviewTournamentId(event.target.value); setPreviewGroup('all'); setPreviewMapNumber(1); }} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
                             {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
@@ -1533,25 +1548,30 @@ export const AdminPanelModal: React.FC<Props> = ({
                             {previewMapOptions.map((mapNumber) => <option key={mapNumber} value={mapNumber}>Match {mapNumber}</option>)}
                           </select>
                         </label>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Point table color
+                          <select value={previewTableTheme} onChange={(event) => setPreviewTableTheme(event.target.value as keyof typeof STANDINGS_COLOR_THEMES)} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                            {Object.entries(STANDINGS_COLOR_THEMES).map(([themeKey, theme]) => <option key={themeKey} value={themeKey}>{theme.label}</option>)}
+                          </select>
+                        </label>
                       </div>
                       <div className="overflow-hidden rounded-xl border border-lime-300/15 bg-[#052415] sm:rounded-2xl">
                         <div className="overflow-x-auto">
                           <table className="w-full min-w-[680px] border-separate border-spacing-y-1.5 px-2 py-2 text-left sm:border-spacing-y-2 sm:px-3 sm:py-3">
                             <thead>
                               <tr className="text-[9px] font-black uppercase tracking-wider text-[#062c1b] sm:text-xs">
-                                {['#', 'Logo', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading) => <th key={heading} className={`bg-lime-300 px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 sm:py-3 ${heading === 'Team name' ? 'w-[36%] text-left' : 'text-center'}`}>{heading}</th>)}
+                                {['#', '', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading, headingIndex) => <th key={`${heading}-${headingIndex}`} style={{ backgroundColor: standingsTheme.accent, color: standingsTheme.text }} className={`px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 sm:py-3 ${heading === 'Team name' ? 'w-[36%] text-left' : 'text-center'}`}>{heading}</th>)}
                               </tr>
                             </thead>
                             <tbody>
                               {previewRows.length ? previewRows.map(({ team, result }, index) => (
                                 <tr key={team.id} className={`text-xs font-extrabold sm:text-sm ${result?.position === 1 ? 'text-lime-100' : ''}`}>
-                                  <td className="rounded-l-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{String(index + 1).padStart(2, '0')}</td>
-                                  <td className="bg-[#0a5734] px-2 py-2 text-center"><span className="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-lime-100/15 bg-black/25 text-[9px] font-black text-lime-100">{team.teamLogo ? <img src={team.teamLogo} alt="" className="h-full w-full object-cover" /> : team.teamName.trim().slice(0, 2).toUpperCase()}</span></td>
-                                  <td className="bg-[#0a5734] px-3 py-3 text-white sm:px-4">{team.teamName}</td>
-                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{result ? (result.position === 1 ? '01' : '—') : '—'}</td>
-                                  <td className="bg-[#0a5734] px-3 py-3 text-center tabular-nums text-white">{result ? result.kills : '—'}</td>
-                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{result ? calcPoints(result.position, 0) : '—'}</td>
-                                  <td className="rounded-r-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{result ? result.points : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row, color: standingsTheme.soft }} className="rounded-l-full px-3 py-3 text-center tabular-nums sm:px-4">{String(index + 1).padStart(2, '0')}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row, borderColor: `${standingsTheme.soft}33` }} className="border-y px-2 py-2 text-center"><span className="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border bg-black/25 text-[9px] font-black" style={{ borderColor: `${standingsTheme.soft}33`, color: standingsTheme.soft }}>{team.teamLogo ? <img src={team.teamLogo} alt="" className="h-full w-full object-cover" /> : team.teamName.trim().slice(0, 2).toUpperCase()}</span></td>
+                                  <td style={{ backgroundColor: standingsTheme.row }} className="px-3 py-3 text-white sm:px-4">{team.teamName}</td>
+                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? (result.position === 1 ? '01' : '—') : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row }} className="px-3 py-3 text-center tabular-nums text-white">{result ? result.kills : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? calcPoints(result.position, 0) : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row, color: standingsTheme.soft }} className="rounded-r-full px-3 py-3 text-center tabular-nums sm:px-4">{result ? result.points : '—'}</td>
                                 </tr>
                               )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-lime-100/55">No approved teams registered for this group yet.</td></tr>}
                             </tbody>
