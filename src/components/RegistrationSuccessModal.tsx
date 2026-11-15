@@ -33,6 +33,7 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
   };
   const officialWhatsAppMessage = `Official tournament registration\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTournament: ${tournament.name}`;
   const officialWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(officialWhatsAppMessage)}`;
+  const tournamentUpdatesGroupUrl = 'https://chat.whatsapp.com/JxesDN4y8fB6QT68aygFWr';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -57,6 +58,11 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
           <p className="text-gray-400 text-xs mt-0.5">
             Your squad has claimed a slot in <span className="text-indigo-400 font-semibold">{tournament.name}</span>.
           </p>
+        </div>
+
+        <div className="mb-5 flex flex-col gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/[.07] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0"><div className="text-xs font-extrabold text-emerald-200">Join the WhatsApp updates group</div><p className="mt-0.5 text-[10px] leading-4 text-slate-300">Joining is required to receive future tournament updates.</p></div>
+          <a href={tournamentUpdatesGroupUrl} onClick={(event) => { event.preventDefault(); openWhatsAppTab(tournamentUpdatesGroupUrl); }} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#128c58] px-3 py-2 text-[10px] font-extrabold text-white transition hover:bg-[#16a367]"><MessageCircle size={13}/> Join group</a>
         </div>
 
         {/* Registration ID Banner */}
