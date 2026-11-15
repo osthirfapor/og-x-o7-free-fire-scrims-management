@@ -39,6 +39,17 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /team_account_contacts/{accountId} {
+      allow get, list: if isAdmin();
+      allow create: if (request.auth == null || isAdmin())
+        && !exists(/databases/$(database)/documents/team_accounts/$(accountId))
+        && existsAfter(/databases/$(database)/documents/team_accounts/$(accountId))
+        && request.resource.data.teamName == getAfter(/databases/$(database)/documents/team_accounts/$(accountId)).data.teamName
+        && request.resource.data.whatsappNumber is string
+        && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$|^\\+9779[6-8][0-9]{8}$');
+      allow update, delete: if isAdmin();
+    }
+
     match /team_wallets/{walletId} {
       allow get: if true;
       allow list: if isAdmin();

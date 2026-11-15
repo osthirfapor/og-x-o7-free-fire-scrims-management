@@ -15,7 +15,7 @@ import {
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sendDiscordEvent } from '../lib/discordEvents';
 import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
-import { normalizeBangladeshWhatsAppNumber } from '../utils/phone';
+import { normalizeBangladeshWhatsAppNumber, normalizeWhatsAppNumber } from '../utils/phone';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
 export function generateRegistrationId(): string {
@@ -84,10 +84,13 @@ export async function isTeamNameBanned(teamName: string): Promise<boolean> {
   return snapshot.exists() && snapshot.data().enabled === true;
 }
 
-export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; players: Player[] }): Promise<TeamAccount> {
+export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; whatsappNumber: string; players: Player[] }): Promise<TeamAccount> {
   const teamName = params.teamName.trim();
   const leaderName = params.leaderName.trim();
   if (!teamName || !leaderName || !params.teamLogo.trim()) throw new Error('Complete your team name, captain IGN, and logo.');
+  const normalizedWhatsAppNumber = normalizeWhatsAppNumber(params.whatsappNumber, 'BD')
+    || normalizeWhatsAppNumber(params.whatsappNumber, 'NP');
+  if (!normalizedWhatsAppNumber || normalizedWhatsAppNumber !== params.whatsappNumber) throw new Error('Enter a valid Bangladesh or Nepal WhatsApp number.');
   if (params.players.length < 4 || params.players.length > 5 || params.players.slice(0, 4).some((player) => !player.name.trim())) throw new Error('Add all four main players.');
   if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registration. Contact the organizer.');
   const normalizedTeam = teamName.toLocaleLowerCase();
@@ -109,7 +112,14 @@ export async function createTeamAccount(params: { teamName: string; teamLogo: st
     createdAt: now,
     updatedAt: now,
   };
-  await setDoc(doc(db, 'team_accounts', id), account);
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'team_accounts', id), account);
+  batch.set(doc(db, 'team_account_contacts', id), {
+    teamName,
+    whatsappNumber: normalizedWhatsAppNumber,
+    createdAt: now,
+  });
+  await batch.commit();
   void sendDiscordEvent('team_account_created', {
     'Team name': account.teamName,
     'Captain IGN': account.leaderName,
@@ -545,8 +555,9 @@ export async function deleteRegisteredTeamEverywhere(teamNameInput: string): Pro
     await setDoc(banRef, { id: banRef.id, teamName, enabled: true, updatedAt: now });
     const tournamentsSnapshot = await getDocs(collection(db, 'tournaments'));
     const tournamentIds = tournamentsSnapshot.docs.map((item) => item.id);
-    const [accountSnapshot, resultSnapshot, logSnapshot, activitySnapshot, ...teamSnapshots] = await Promise.all([
+    const [accountSnapshot, contactSnapshot, resultSnapshot, logSnapshot, activitySnapshot, ...teamSnapshots] = await Promise.all([
       getDocs(collection(db, 'team_accounts')),
+      getDocs(collection(db, 'team_account_contacts')),
       getDocs(collection(db, 'match_results')),
       getDocs(collection(db, 'registration_logs')),
       getDocs(collection(db, 'admin_activity_logs')),
@@ -582,11 +593,13 @@ export async function deleteRegisteredTeamEverywhere(teamNameInput: string): Pro
 
     const sameTeam = (data: Record<string, unknown>) => String(data.teamName || '').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ') === teamKey;
     const accounts = accountSnapshot.docs.filter((item) => sameTeam(item.data()));
+    const contacts = contactSnapshot.docs.filter((item) => sameTeam(item.data()));
     const results = resultSnapshot.docs.filter((item) => sameTeam(item.data()));
     const logs = logSnapshot.docs.filter((item) => sameTeam(item.data()));
     const activity = activitySnapshot.docs.filter((item) => sameTeam(item.data()));
     const refs = [
       ...accounts.map((item) => item.ref),
+      ...contacts.map((item) => item.ref),
       ...results.map((item) => item.ref),
       ...logs.map((item) => item.ref),
       ...activity.map((item) => item.ref),
