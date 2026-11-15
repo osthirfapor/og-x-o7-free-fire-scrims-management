@@ -665,22 +665,12 @@ function MainApp() {
 
         {/* ================= BODY CONTENT AREA ================= */}
         <div key={activeTab} className="app-main-content flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="page-intro mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-7 sm:gap-4">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-indigo-300">
-                <span className="h-px w-6 bg-gradient-to-r from-cyan-300 to-indigo-400" /> OG x o7 competitive hub
-              </div>
-              <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-                {activeTab === 'tournaments' || activeTab === 'registered_teams'
-                  ? 'Tournament arena'
-                  : activeTab === 'my_tournaments' ? 'My Tournaments' : activeTab === 'tournament_history' ? 'Tournament History' : 'Player Leaderboard'}
-              </h1>
-              <p className="mt-1 text-xs text-slate-400 sm:text-sm">
-                {activeTab === 'tournaments' || activeTab === 'registered_teams'
-                  ? 'Find your next Free Fire scrim and secure your squad’s place.'
-                  : activeTab === 'my_tournaments' ? 'Your active squad registrations.' : activeTab === 'tournament_history' ? 'Completed tournaments your squad registered for.' : 'Rankings for every registered player, based on published match results.'}
-              </p>
-            </div>
+          <div className={`page-intro mb-5 flex ${activeTab === 'tournaments' ? 'justify-end' : 'flex-wrap items-end justify-between gap-3'} sm:mb-7 sm:gap-4`}>
+            {activeTab !== 'tournaments' && <div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-indigo-300"><span className="h-px w-6 bg-gradient-to-r from-cyan-300 to-indigo-400" /> OG x o7 competitive hub</div>
+              <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">{activeTab === 'registered_teams' ? 'Tournament arena' : activeTab === 'my_tournaments' ? 'My Tournaments' : activeTab === 'tournament_history' ? 'Tournament History' : 'Player Leaderboard'}</h1>
+              <p className="mt-1 text-xs text-slate-400 sm:text-sm">{activeTab === 'registered_teams' ? 'Find your next Free Fire scrim and secure your squad’s place.' : activeTab === 'my_tournaments' ? 'Your active squad registrations.' : activeTab === 'tournament_history' ? 'Completed tournaments your squad registered for.' : 'Rankings for every registered player, based on published match results.'}</p>
+            </div>}
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
               {loadingTournaments ? 'Connecting to Firebase' : `${filteredTournaments.length} tournaments live`}
