@@ -169,13 +169,19 @@ function MainApp() {
     findRegisteredTeamProfile(teamProfile.teamName, teamProfile.leaderName)
       .then(async (verifiedProfile) => {
         if (cancelled) return;
-        if (!verifiedProfile || verifiedProfile.registrationId !== teamProfile.registrationId) {
-          localStorage.removeItem('ogxo7_captain_team_profile');
-          setTeamProfile(null);
+        if (!verifiedProfile) {
+          console.warn('Saved squad was not found in the latest database read; keeping its local session.');
           return;
         }
-        await saveTeamProfile(verifiedProfile);
-        if (!cancelled) setTeamProfile(verifiedProfile);
+        const refreshedProfile: TeamProfile = {
+          ...verifiedProfile,
+          // Keep the stable account/session identity across tournament entries.
+          userId: teamProfile.userId,
+          registrationId: teamProfile.registrationId || verifiedProfile.registrationId,
+          whatsappNumber: teamProfile.whatsappNumber || verifiedProfile.whatsappNumber,
+        };
+        await saveTeamProfile(refreshedProfile);
+        if (!cancelled) setTeamProfile(refreshedProfile);
       })
       .catch((error) => {
         // A temporary Firestore/network failure must not erase a valid saved
