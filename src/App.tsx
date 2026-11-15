@@ -31,6 +31,7 @@ import {
   Infinity as InfinityIcon,
   Hash,
   Edit2,
+  History as HistoryIcon,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TeamAccount, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -118,7 +119,7 @@ function MainApp() {
   const { isAdmin } = useAuth();
 
   // Navigation views include tournament pages, the player leaderboard, and registered teams.
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'my_tournaments' | 'registered_teams' | 'player_search'>('tournaments');
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'my_tournaments' | 'tournament_history' | 'registered_teams' | 'player_search'>('tournaments');
   const [categoryFilter, setCategoryFilter] = useState<'all' | TournamentCategory>('all');
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -387,6 +388,11 @@ function MainApp() {
     );
     return idx === -1 ? null : { rank: idx + 1, ...leaderboard[idx] };
   }, [leaderboard, teamProfile]);
+  const myActiveRegistrations = myRegistrations.filter((registration) => registration.tournament.status !== 'completed');
+  const myCompletedRegistrations = myRegistrations.filter((registration) => registration.tournament.status === 'completed');
+  const renderRegistrationCards = (registrations: typeof myRegistrations, completed = false) => registrations.length ? (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{registrations.map(({ team, tournament, groupName }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider ${completed ? 'border-slate-300/15 bg-slate-300/[.06] text-slate-300' : 'border-cyan-300/15 bg-cyan-300/[.06] text-cyan-200'}`}><CheckCircle2 size={11} /> {completed ? 'Completed' : 'Registered'}</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div>{(tournament.groupsEnabled || tournament.unlimitedGroups || tournament.unlimitedTeams) && <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/[.08] px-3 py-2 text-violet-100">{groupName ? <><span className="text-[9px] font-bold uppercase tracking-wider text-violet-200/70">Your Group</span><span className="ml-auto text-sm font-black tracking-wide">{groupName}</span></> : <span className="text-[10px] font-semibold">Group assignment is being prepared</span>}</div>}<div className="mt-3 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">{completed ? 'View history →' : 'View teams →'}</span></div></button>)}</div>
+  ) : null;
 
   const handleRegisterSuccess = (team: Team, tournament: Tournament) => {
     setShowRegModal(false);
@@ -560,7 +566,8 @@ function MainApp() {
             <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Menu</div>
             {[
               { key: 'tournaments', label: 'Tournaments', icon: <Flame size={17} />, tint: 'text-indigo-400' },
-              { key: 'my_tournaments', label: 'My Tournaments', icon: <CalendarDays size={17} />, tint: 'text-cyan-300' },
+              { key: 'my_tournaments', label: `My Tournaments (${myActiveRegistrations.length})`, icon: <CalendarDays size={17} />, tint: 'text-cyan-300' },
+              { key: 'tournament_history', label: `Tournament History (${myCompletedRegistrations.length})`, icon: <HistoryIcon size={17} />, tint: 'text-slate-300' },
               { key: 'player_search', label: 'Leaderboard', icon: <Trophy size={17} />, tint: 'text-amber-400' },
             ].map((item) => {
               const active = activeTab === item.key || (item.key === 'tournaments' && activeTab === 'registered_teams');
@@ -664,12 +671,12 @@ function MainApp() {
               <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Tournament arena'
-                  : activeTab === 'my_tournaments' ? 'My Tournaments' : 'Player Leaderboard'}
+                  : activeTab === 'my_tournaments' ? 'My Tournaments' : activeTab === 'tournament_history' ? 'Tournament History' : 'Player Leaderboard'}
               </h1>
               <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                 {activeTab === 'tournaments' || activeTab === 'registered_teams'
                   ? 'Find your next Free Fire scrim and secure your squad’s place.'
-                  : activeTab === 'my_tournaments' ? 'Your squad’s registrations. Select a tournament to view its registered teams.' : 'Rankings for every registered player, based on published match results.'}
+                  : activeTab === 'my_tournaments' ? 'Your active squad registrations.' : activeTab === 'tournament_history' ? 'Completed tournaments your squad registered for.' : 'Rankings for every registered player, based on published match results.'}
               </p>
             </div>
             <div className="live-indicator inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
@@ -895,10 +902,15 @@ function MainApp() {
           {/* My squad registrations */}
           {activeTab === 'my_tournaments' && (
             <section className="space-y-4">
-              <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
-              {myRegistrations.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><CalendarDays size={26} className="mx-auto text-slate-600" /><h3 className="mt-3 text-sm font-bold text-white">No registrations yet</h3><p className="mt-1 text-xs text-slate-500">When your squad registers, tournaments will appear here.</p><button type="button" onClick={() => setActiveTab('tournaments')} className="mt-4 rounded-xl bg-indigo-500/15 px-4 py-2 text-xs font-bold text-indigo-200">Explore open tournaments</button></div> : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{myRegistrations.map(({ team, tournament, groupName }) => <button type="button" key={team.id} onClick={() => { setActiveTournament(tournament); setActiveTab('registered_teams'); setMobileMenuOpen(false); }} className="group rounded-2xl border border-white/[.08] bg-[#141720] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#181c27] hover:shadow-xl hover:shadow-cyan-950/10"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-cyan-200"><CheckCircle2 size={11} /> Registered</span><h3 className="mt-3 truncate text-sm font-extrabold text-white group-hover:text-cyan-100">{tournament.name}</h3></div><CalendarDays size={17} className="shrink-0 text-cyan-200/70" /></div><div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span>{tournament.date}</span><span>{tournament.time}</span></div>{(tournament.groupsEnabled || tournament.unlimitedGroups || tournament.unlimitedTeams) && <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/[.08] px-3 py-2 text-violet-100">{groupName ? <><span className="text-[9px] font-bold uppercase tracking-wider text-violet-200/70">Your Group</span><span className="ml-auto text-sm font-black tracking-wide">{groupName}</span></> : <span className="text-[10px] font-semibold">Group assignment is being prepared</span>}</div>}<div className="mt-3 flex items-center justify-between border-t border-white/[.06] pt-3 text-[10px]"><span className="truncate font-semibold text-slate-300">{team.teamName}</span><span className="text-cyan-200 transition group-hover:translate-x-0.5">View teams →</span></div></button>)}</div>
-              )}
+              <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Active squad registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">My Tournaments <span className="ml-1 text-sm text-slate-500">({myActiveRegistrations.length})</span></h2></div><button type="button" onClick={() => { setActiveTab('tournaments'); setMobileMenuOpen(false); }} className="rounded-xl border border-indigo-300/15 px-3 py-2 text-[11px] font-bold text-indigo-200 transition hover:bg-indigo-300/[.08]">Browse tournaments</button></div>
+              {renderRegistrationCards(myActiveRegistrations) || <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><CalendarDays size={26} className="mx-auto text-slate-600" /><h3 className="mt-3 text-sm font-bold text-white">No active registrations</h3><p className="mt-1 text-xs text-slate-500">Completed tournaments are kept in Tournament History.</p><button type="button" onClick={() => setActiveTab('tournaments')} className="mt-4 rounded-xl bg-indigo-500/15 px-4 py-2 text-xs font-bold text-indigo-200">Explore open tournaments</button></div>}
+            </section>
+          )}
+
+          {activeTab === 'tournament_history' && (
+            <section className="space-y-4">
+              <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-300">Completed registrations</div><h2 className="mt-1 text-lg font-extrabold text-white">Tournament History <span className="ml-1 text-sm text-slate-500">({myCompletedRegistrations.length})</span></h2><p className="mt-1 text-xs text-slate-400">Only completed tournaments your squad joined appear here.</p></div>
+              {renderRegistrationCards(myCompletedRegistrations, true) || <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><HistoryIcon size={26} className="mx-auto text-slate-600"/><h3 className="mt-3 text-sm font-bold text-white">No completed tournaments yet</h3><p className="mt-1 text-xs text-slate-500">When one of your registered tournaments is completed, it will be archived here.</p></div>}
             </section>
           )}
 
