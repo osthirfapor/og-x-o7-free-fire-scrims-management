@@ -490,8 +490,9 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     redirectButtonText: data.redirectButtonText || 'Join WhatsApp / Discord Group',
     map: data.map || 'Purgatory',
     groupsEnabled: data.groupsEnabled === true,
-    teamsPerGroup: data.groupsEnabled ? Math.max(1, Number(data.teamsPerGroup) || 12) : undefined,
-    groupCount: data.groupsEnabled ? Math.max(1, Number(data.groupCount) || 1) : undefined,
+    // Firestore rejects undefined values; use zero when grouping is disabled.
+    teamsPerGroup: data.groupsEnabled ? Math.max(1, Number(data.teamsPerGroup) || 12) : 0,
+    groupCount: data.groupsEnabled ? Math.max(1, Number(data.groupCount) || 1) : 0,
     unlimitedTeams: data.unlimitedTeams === true,
     entryFee: data.entryFee || '',
     entryFeeAmount: Number(data.entryFeeAmount ?? data.entryFee ?? 0) || 0,
