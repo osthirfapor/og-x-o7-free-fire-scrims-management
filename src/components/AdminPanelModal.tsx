@@ -248,6 +248,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [results, setResults] = useState<MatchResult[]>([]);
   const [resTeam, setResTeam] = useState('');
   const [resultsTournamentId, setResultsTournamentId] = useState(activeTournament.id);
+  const [resultsGroup, setResultsGroup] = useState(() => activeTournament.groupsEnabled || activeTournament.unlimitedGroups || activeTournament.unlimitedTeams ? resultGroupLabel(0) : 'all');
   const [resMapNumber, setResMapNumber] = useState(1);
   const [resPosition, setResPosition] = useState(1);
   const [resKills, setResKills] = useState(0);
@@ -266,6 +267,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   useEffect(() => {
     setCurrentTour(activeTournament);
     setResultsTournamentId(activeTournament.id);
+    setResultsGroup(activeTournament.groupsEnabled || activeTournament.unlimitedGroups || activeTournament.unlimitedTeams ? resultGroupLabel(0) : 'all');
     setTourName(activeTournament.name);
     setTourDate(activeTournament.date);
     setTourTime(activeTournament.time);
@@ -723,13 +725,16 @@ export const AdminPanelModal: React.FC<Props> = ({
   const handlePublishResults = async () => {
     const selectedResultsTournament = tournaments.find((tournament) => tournament.id === resultsTournamentId) || currentTour;
     const themeChanged = selectedResultsTournament.standingsTheme !== previewTableTheme;
-    if (!draftTourResults.length && !themeChanged) return;
-    const publishSummary = [draftTourResults.length ? `${draftTourResults.length} result(s)` : '', themeChanged ? 'the standings table color' : ''].filter(Boolean).join(' and ');
-    if (!confirm(`Publish ${publishSummary} for ${selectedResultsTournament.name} so teams can view them in My Tournaments?`)) return;
+    const groupDrafts = draftTourResults.filter((result) => !resultsGroupsEnabled || resultTeamGroupMap.get(result.teamName.trim().toLocaleLowerCase()) === resultsGroup);
+    if (!groupDrafts.length && !themeChanged) return;
+    const publishSummary = [groupDrafts.length ? `${groupDrafts.length} result(s)` : '', themeChanged ? 'the standings table color' : ''].filter(Boolean).join(' and ');
+    const groupDescription = resultsGroupsEnabled ? ` for ${resultsGroup}` : '';
+    if (!confirm(`Publish ${publishSummary}${groupDescription} in ${selectedResultsTournament.name} so teams can view them in My Tournaments?`)) return;
     try {
-      const publishedCount = await publishTournamentResults(selectedResultsTournament.id, previewTableTheme);
-      void writeAdminActivityLog({ eventType: 'match_results_published', summary: `Published ${publishedCount} result(s) for ${selectedResultsTournament.name}.`, tournamentId: selectedResultsTournament.id, tournamentName: selectedResultsTournament.name }).catch((error) => console.warn('Could not save admin activity log:', error));
-      setResMsg(`✅ Published ${publishedCount} result(s) and standings table for teams.`);
+      const groupTeamNames = resultsGroupsEnabled ? resultRegisteredTeams.filter((team) => resultTeamGroupMap.get(team.teamName.trim().toLocaleLowerCase()) === resultsGroup).map((team) => team.teamName) : undefined;
+      const publishedCount = await publishTournamentResults(selectedResultsTournament.id, previewTableTheme, groupTeamNames);
+      void writeAdminActivityLog({ eventType: 'match_results_published', summary: `Published ${publishedCount} result(s)${groupDescription} for ${selectedResultsTournament.name}.`, tournamentId: selectedResultsTournament.id, tournamentName: selectedResultsTournament.name }).catch((error) => console.warn('Could not save admin activity log:', error));
+      setResMsg(`✅ Published ${publishedCount} result(s)${groupDescription} and standings table for teams.`);
       window.setTimeout(() => setResMsg(null), 3000);
     } catch (err) {
       setResMsg(`❌ ${err instanceof Error ? err.message : 'Could not publish results.'}`);
@@ -742,11 +747,19 @@ export const AdminPanelModal: React.FC<Props> = ({
     const teamsForSelectedTournament = sourceTeams.length ? sourceTeams : teams.filter((team) => team.tournamentId === selectedResultsTournament.id && team.status === 'approved');
     return [...teamsForSelectedTournament].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '') || a.teamName.localeCompare(b.teamName));
   })();
+  const resultsGroupsEnabled = selectedResultsTournament.groupsEnabled === true || selectedResultsTournament.unlimitedGroups === true || selectedResultsTournament.unlimitedTeams === true;
+  const resultTeamsPerGroup = Math.max(1, Number(selectedResultsTournament.teamsPerGroup) || DEFAULT_GROUP_SIZE);
+  const orderedResultTeams = [...resultRegisteredTeams].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime() || a.id.localeCompare(b.id));
+  const resultTeamGroupMap = new Map(orderedResultTeams.map((team, index) => [team.teamName.trim().toLocaleLowerCase(), resultGroupLabel(Math.floor(index / resultTeamsPerGroup))]));
+  const resultGroupCount = resultsGroupsEnabled ? Math.max(1, Math.ceil(orderedResultTeams.length / resultTeamsPerGroup), selectedResultsTournament.unlimitedGroups || selectedResultsTournament.unlimitedTeams ? 0 : Number(selectedResultsTournament.groupCount) || 0) : 0;
+  const resultGroupOptions = resultsGroupsEnabled ? Array.from({ length: resultGroupCount }, (_, index) => resultGroupLabel(index)) : [];
+  const resultGroupTeams = resultsGroupsEnabled ? resultRegisteredTeams.filter((team) => resultTeamGroupMap.get(team.teamName.trim().toLocaleLowerCase()) === resultsGroup) : resultRegisteredTeams;
   const tourResults = results
     .filter((r) => r.tournamentId === selectedResultsTournament.id)
     .sort((a, b) => (a.mapNumber || 1) - (b.mapNumber || 1) || a.position - b.position || b.kills - a.kills);
-  const selectedMapResults = tourResults.filter((result) => (result.mapNumber || 1) === resMapNumber);
-  const selectedMapRows = [...resultRegisteredTeams].sort((a, b) => {
+  const selectedGroupResults = resultsGroupsEnabled ? tourResults.filter((result) => resultTeamGroupMap.get(result.teamName.trim().toLocaleLowerCase()) === resultsGroup) : tourResults;
+  const selectedMapResults = selectedGroupResults.filter((result) => (result.mapNumber || 1) === resMapNumber);
+  const selectedMapRows = [...resultGroupTeams].sort((a, b) => {
     const aResult = selectedMapResults.find((result) => result.teamName.trim().toLocaleLowerCase() === a.teamName.trim().toLocaleLowerCase());
     const bResult = selectedMapResults.find((result) => result.teamName.trim().toLocaleLowerCase() === b.teamName.trim().toLocaleLowerCase());
     if (aResult && bResult) return aResult.position - bResult.position || bResult.kills - aResult.kills;
@@ -760,7 +773,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id));
   const previewGroupsEnabled = previewTournament.groupsEnabled === true || previewTournament.unlimitedGroups === true || previewTournament.unlimitedTeams === true;
   const previewTeamsPerGroup = previewTournament.teamsPerGroup || DEFAULT_GROUP_SIZE;
-  const previewGroupCount = previewGroupsEnabled ? Math.max(1, Number(previewTournament.groupCount) || Math.ceil(previewRegisteredTeams.length / previewTeamsPerGroup) || 1) : 0;
+  const previewGroupCount = previewGroupsEnabled ? Math.max(1, Math.ceil(previewRegisteredTeams.length / previewTeamsPerGroup), previewTournament.unlimitedGroups || previewTournament.unlimitedTeams ? 0 : Number(previewTournament.groupCount) || 0) : 0;
   const previewTeamGroups = new Map(previewRegisteredTeams.map((team, index) => [team.teamName.trim().toLocaleLowerCase(), resultGroupLabel(Math.floor(index / previewTeamsPerGroup))]));
   const previewGroupOptions = previewGroupsEnabled ? Array.from({ length: previewGroupCount }, (_, index) => resultGroupLabel(index)) : [];
   const previewTournamentResults = results.filter((result) => result.tournamentId === previewTournament.id);
@@ -786,6 +799,7 @@ export const AdminPanelModal: React.FC<Props> = ({
       return new Date(a.team.createdAt).getTime() - new Date(b.team.createdAt).getTime() || a.team.id.localeCompare(b.team.id);
     });
   const draftTourResults = tourResults.filter((result) => result.published === false);
+  const visibleDraftTourResults = resultsGroupsEnabled ? draftTourResults.filter((result) => resultTeamGroupMap.get(result.teamName.trim().toLocaleLowerCase()) === resultsGroup) : draftTourResults;
   const publishedTourResults = results
     .filter((result) => result.published !== false)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -1344,7 +1358,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                 <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-300/15 bg-gradient-to-r from-emerald-500/[.08] to-cyan-500/[.04] px-4 py-3">
                   <div><div className="text-xs font-extrabold uppercase tracking-wider text-white">Publish tournament standings</div><p className="mt-1 text-[10px] text-slate-400">Teams can view published results from My Tournaments.</p></div>
-                  <button type="button" disabled={!draftTourResults.length && selectedResultsTournament.standingsTheme === previewTableTheme} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-emerald-950/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"><CheckCircle2 size={15} /> Publish Results ({draftTourResults.length})</button>
+                  <button type="button" disabled={!visibleDraftTourResults.length && selectedResultsTournament.standingsTheme === previewTableTheme} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-emerald-950/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"><CheckCircle2 size={15} /> Publish {resultsGroupsEnabled ? resultsGroup : 'Results'} ({visibleDraftTourResults.length})</button>
                 </div>
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
                   <div className="xl:col-span-2 space-y-4">
@@ -1358,7 +1372,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
                       <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
                         <label className="block text-xs text-gray-400">Tournament
-                          <select value={resultsTournamentId} onChange={(event) => { setResultsTournamentId(event.target.value); setResTeam(''); setResMapNumber(1); setResMsg(null); }} className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                          <select value={resultsTournamentId} onChange={(event) => { const nextTournament = tournaments.find((tournament) => tournament.id === event.target.value); setResultsTournamentId(event.target.value); setResultsGroup(nextTournament?.groupsEnabled || nextTournament?.unlimitedGroups || nextTournament?.unlimitedTeams ? resultGroupLabel(0) : 'all'); setResTeam(''); setResMapNumber(1); setResMsg(null); }} className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
                             {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
                           </select>
                         </label>
@@ -1366,9 +1380,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <input type="number" min="1" max="99" value={resMapNumber} onChange={(event) => setResMapNumber(Math.max(1, Math.floor(Number(event.target.value) || 1)))} className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500" />
                         </label>
                       </div>
+                      {resultsGroupsEnabled && <label className="block text-xs text-gray-400">Group for this result
+                        <select value={resultsGroup} onChange={(event) => { setResultsGroup(event.target.value); setResTeam(''); setResMsg(null); }} className="mt-1 w-full rounded-xl border border-cyan-300/20 bg-[#0b0c10] px-3 py-2 text-xs font-bold text-cyan-100 focus:outline-none focus:border-cyan-300/50">
+                          {resultGroupOptions.map((group) => <option key={group} value={group}>{group}</option>)}
+                        </select>
+                      </label>}
                       <div className="flex items-center justify-between rounded-lg border border-cyan-300/10 bg-cyan-300/[.04] px-3 py-2 text-[10px] text-cyan-100">
-                        <span>{resultRegisteredTeams.length} registered teams</span>
-                        <span>{new Set(tourResults.map((result) => result.mapNumber || 1)).size} maps entered</span>
+                        <span>{resultGroupTeams.length} teams · {resultsGroupsEnabled ? resultsGroup : selectedResultsTournament.name}</span>
+                        <span>{new Set(selectedGroupResults.map((result) => result.mapNumber || 1)).size} maps entered</span>
                       </div>
 
                       <div>
@@ -1379,7 +1398,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                         >
                           <option value="">— Select registered team —</option>
-                          {resultRegisteredTeams.map((t, index) => (
+                          {resultGroupTeams.map((t, index) => (
                             <option key={t.id} value={t.teamName}>
                               {String(index + 1).padStart(2, '0')} · {t.teamName}
                             </option>
@@ -1395,7 +1414,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             onChange={(e) => setResPosition(Number(e.target.value))}
                             className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                           >
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                            {Array.from({ length: Math.max(12, resultGroupTeams.length) }, (_, i) => i + 1).map((n) => (
                               <option key={n} value={n}>
                                 {n === 1 ? '#1 — Winner 👑' : `#${n}`}
                               </option>
@@ -1448,8 +1467,8 @@ export const AdminPanelModal: React.FC<Props> = ({
                         <div className="text-xs font-bold uppercase tracking-wider text-gray-300">Registered teams</div>
                         <span className="rounded-md border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-bold text-cyan-100">MAP {resMapNumber}</span>
                       </div>
-                      {resultRegisteredTeams.length ? <div className="max-h-64 divide-y divide-white/[.05] overflow-y-auto">
-                        {resultRegisteredTeams.map((team, index) => {
+                      {resultGroupTeams.length ? <div className="max-h-64 divide-y divide-white/[.05] overflow-y-auto">
+                        {resultGroupTeams.map((team, index) => {
                           const saved = tourResults.some((result) => (result.mapNumber || 1) === resMapNumber && result.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase());
                           return <button key={team.id} type="button" disabled={saved} onClick={() => { setResTeam(team.teamName); setResMsg(null); }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition hover:bg-white/[.035] disabled:cursor-default">
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/30 text-[10px] font-black tabular-nums text-slate-400">{String(index + 1).padStart(2, '0')}</span>
@@ -1457,7 +1476,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             {saved ? <span className="shrink-0 rounded-md border border-emerald-300/15 bg-emerald-300/[.06] px-2 py-1 text-[9px] font-bold text-emerald-200">ADDED</span> : <span className={`shrink-0 rounded-md px-2 py-1 text-[9px] font-bold ${resTeam === team.teamName ? 'bg-amber-300/15 text-amber-100' : 'bg-white/[.05] text-slate-400'}`}>{resTeam === team.teamName ? 'SELECTED' : 'SELECT'}</span>}
                           </button>;
                         })}
-                      </div> : <p className="px-3.5 py-5 text-center text-[11px] text-gray-500">No approved teams registered for this tournament.</p>}
+                      </div> : <p className="px-3.5 py-5 text-center text-[11px] text-gray-500">{resultsGroupsEnabled ? `No registered teams in ${resultsGroup} yet.` : 'No approved teams registered for this tournament.'}</p>}
                     </section>
 
 
@@ -1468,9 +1487,9 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[.06] px-3.5 py-3">
                         <div>
                           <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} entry preview</div>
-                          <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name} · {selectedMapResults.length}/{resultRegisteredTeams.length} teams entered</div>
+                          <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name}{resultsGroupsEnabled ? ` · ${resultsGroup}` : ''} · {selectedMapResults.length}/{resultGroupTeams.length} teams entered</div>
                         </div>
-                        <button type="button" onClick={() => { setPreviewTournamentId(resultsTournamentId); setPreviewGroup((selectedResultsTournament.groupsEnabled || selectedResultsTournament.unlimitedGroups || selectedResultsTournament.unlimitedTeams) ? resultGroupLabel(0) : 'all'); setShowStandingsPreview(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
+                        <button type="button" onClick={() => { setPreviewTournamentId(resultsTournamentId); setPreviewGroup(resultsGroupsEnabled ? resultsGroup : 'all'); setShowStandingsPreview(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left text-[10px]">
@@ -1499,16 +1518,16 @@ export const AdminPanelModal: React.FC<Props> = ({
                         <div className="text-xs font-bold text-gray-300 uppercase tracking-wider">Unpublished Results — {selectedResultsTournament.name}</div>
                         <span className="text-[11px] text-gray-500">Public leaderboard updates when you publish.</span>
                       </div>
-                      <button type="button" disabled={!draftTourResults.length} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-[11px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
-                        <CheckCircle2 size={13} /> Publish Results ({draftTourResults.length})
+                      <button type="button" disabled={!visibleDraftTourResults.length} onClick={() => void handlePublishResults()} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-[11px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+                        <CheckCircle2 size={13} /> Publish {resultsGroupsEnabled ? resultsGroup : 'Results'} ({visibleDraftTourResults.length})
                       </button>
                     </div>
 
-                    {draftTourResults.length === 0 ? (
+                    {visibleDraftTourResults.length === 0 ? (
                       <div className="text-center text-xs text-gray-500 py-10">No unpublished results. Add a result or view Match History.</div>
                     ) : (
                       <div className="space-y-2">
-                        {draftTourResults.map((r) => (
+                        {visibleDraftTourResults.map((r) => (
                           <div
                             key={r.id}
                             className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${
@@ -1526,7 +1545,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                               <div className="min-w-0">
                                 <div className="font-bold text-white text-sm truncate">{r.teamName}</div>
                                 <div className="text-gray-400">
-                                  Map {r.mapNumber || 1} • {r.kills} kills • <span className="text-indigo-300 font-mono">{r.points} pts</span>
+                                  {resultsGroupsEnabled && <span className="text-cyan-200">{resultsGroup} · </span>}Map {r.mapNumber || 1} • {r.kills} kills • <span className="text-indigo-300 font-mono">{r.points} pts</span>
                                   {(r.earnings || 0) > 0 && <span className="ml-2 text-emerald-300 font-semibold">৳{Number(r.earnings).toLocaleString()}</span>}
                                   {r.position === 1 && <span className="ml-2 text-amber-300 font-bold">WINNER</span>}
                                 </div>

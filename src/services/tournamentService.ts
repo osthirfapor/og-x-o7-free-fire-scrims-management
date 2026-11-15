@@ -804,12 +804,15 @@ export async function addMatchResult(params: {
   }
 }
 
-export async function publishTournamentResults(tournamentId: string, standingsTheme?: Tournament['standingsTheme']): Promise<number> {
+export async function publishTournamentResults(tournamentId: string, standingsTheme?: Tournament['standingsTheme'], teamNames?: string[]): Promise<number> {
   try {
     const snapshot = await getDocs(collection(db, 'match_results'));
+    const allowedTeamNames = teamNames ? new Set(teamNames.map((name) => name.trim().toLocaleLowerCase())) : null;
     const drafts = snapshot.docs.filter((item) => {
       const result = item.data() as MatchResult;
-      return result.tournamentId === tournamentId && result.published === false;
+      return result.tournamentId === tournamentId
+        && result.published === false
+        && (!allowedTeamNames || allowedTeamNames.has(result.teamName.trim().toLocaleLowerCase()));
     });
     const publishedAt = new Date().toISOString();
     await Promise.all(drafts.map((item) => updateDoc(item.ref, { published: true, publishedAt })));
