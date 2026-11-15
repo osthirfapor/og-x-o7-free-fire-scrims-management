@@ -29,6 +29,8 @@ import {
   CalendarDays,
   CheckCircle2,
   MessageCircle,
+  Infinity as InfinityIcon,
+  Hash,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TeamAccount, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -828,8 +830,12 @@ function MainApp() {
                                 </button>
                               )}
                             </div>
+                            {(tour.prizePool || tour.roomId) && <div className="mt-2 flex min-w-0 gap-1.5">
+                              {tour.prizePool && <span title={`Prize pool: ${tour.prizePool}`} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-lg border border-amber-300/20 bg-amber-300/[.08] px-2 py-1 text-[9px] font-bold text-amber-100"><Trophy size={11} className="shrink-0"/><span className="truncate">Prize · {tour.prizePool}</span></span>}
+                              {tour.roomId && <span title={`Room ID: ${tour.roomId}`} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-lg border border-cyan-300/20 bg-cyan-300/[.07] px-2 py-1 text-[9px] font-bold text-cyan-100"><Hash size={11} className="shrink-0"/><span className="truncate">Room · {tour.roomId}</span></span>}
+                            </div>}
                             <div className="mt-2 space-y-1.5 text-[9px] sm:text-[10px]">
-                              <div className="flex items-center justify-between gap-2 font-semibold"><span className="text-slate-300">{tour.registeredCount}/{tour.unlimitedTeams ? '∞' : tour.maxTeams} teams</span>{remainingSlots !== null && <span className={remainingSlots ? 'text-emerald-300' : 'text-rose-300'}>{remainingSlots} {remainingSlots === 1 ? 'slot' : 'slots'} left</span>}</div>
+                              <div className="flex items-center justify-between gap-2 font-semibold"><span className="text-slate-300">{tour.unlimitedTeams ? `${tour.registeredCount} teams registered` : `${tour.registeredCount}/${tour.maxTeams} teams`}</span>{tour.unlimitedTeams ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/20 bg-emerald-300/[.07] px-2 py-0.5 text-emerald-200"><InfinityIcon size={13}/> OPEN ENTRY</span> : <span className={remainingSlots ? 'text-emerald-300' : 'text-rose-300'}>{remainingSlots} {remainingSlots === 1 ? 'slot' : 'slots'} left</span>}</div>
                               {!tour.unlimitedTeams && <div role="progressbar" aria-label={`${tour.name} registration slots`} aria-valuemin={0} aria-valuemax={tour.maxTeams} aria-valuenow={tour.registeredCount} className="h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/50"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-indigo-400 transition-[width] duration-700 ease-out" style={{ width: `${filledPercent}%` }} /></div>}
                             </div>
                           </div>

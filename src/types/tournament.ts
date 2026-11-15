@@ -76,6 +76,7 @@ export interface Tournament {
   entryFee?: string;
   entryFeeAmount?: number;
   prizePool?: string;
+  roomId?: string;
   bannerUrl?: string;
   cardImageUrl?: string;
   createdAt: string;

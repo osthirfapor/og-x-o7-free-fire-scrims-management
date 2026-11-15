@@ -497,6 +497,7 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     entryFee: data.entryFee || '',
     entryFeeAmount: Number(data.entryFeeAmount ?? data.entryFee ?? 0) || 0,
     prizePool: data.prizePool || '',
+    roomId: data.roomId || '',
     bannerUrl: data.bannerUrl || '',
     cardImageUrl: data.cardImageUrl || '',
     createdAt: now,

@@ -131,6 +131,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourTime, setTourTime] = useState(currentTour.time);
   const [tourMaxTeams, setTourMaxTeams] = useState(currentTour.maxTeams);
   const [tourEntryFee, setTourEntryFee] = useState(currentTour.entryFee || '');
+  const [tourPrizePool, setTourPrizePool] = useState(currentTour.prizePool || '');
+  const [tourRoomId, setTourRoomId] = useState(currentTour.roomId || '');
   const [tourStatus, setTourStatus] = useState(currentTour.status);
   const [tourGroupsEnabled, setTourGroupsEnabled] = useState(currentTour.groupsEnabled === true);
   const [tourUnlimitedTeams, setTourUnlimitedTeams] = useState(currentTour.unlimitedTeams === true);
@@ -164,6 +166,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourGroupCount, setNewTourGroupCount] = useState(1);
   const [newTourCategory, setNewTourCategory] = useState<'practice' | 'free' | 'paid'>('practice');
   const [newTourEntryFee, setNewTourEntryFee] = useState('');
+  const [newTourPrizePool, setNewTourPrizePool] = useState('');
+  const [newTourRoomId, setNewTourRoomId] = useState('');
   const [newTourGroupLink, setNewTourGroupLink] = useState('');
   const [newTourCardImage, setNewTourCardImage] = useState('');
   const [newTourCardImageName, setNewTourCardImageName] = useState('');
@@ -236,6 +240,8 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourTime(activeTournament.time);
     setTourMaxTeams(activeTournament.maxTeams);
     setTourEntryFee(activeTournament.entryFee || '');
+    setTourPrizePool(activeTournament.prizePool || '');
+    setTourRoomId(activeTournament.roomId || '');
     setTourStatus(activeTournament.status);
     setTourGroupsEnabled(activeTournament.groupsEnabled === true);
     setTourUnlimitedTeams(activeTournament.unlimitedTeams === true);
@@ -326,6 +332,8 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourTime(tour.time);
     setTourMaxTeams(tour.maxTeams);
     setTourEntryFee(tour.entryFee || '');
+    setTourPrizePool(tour.prizePool || '');
+    setTourRoomId(tour.roomId || '');
     setTourStatus(tour.status);
     setTourGroupsEnabled(tour.groupsEnabled === true);
     setTourUnlimitedTeams(tour.unlimitedTeams === true);
@@ -434,6 +442,8 @@ export const AdminPanelModal: React.FC<Props> = ({
         groupCount: tourGroupsEnabled ? tourGroupCount : 0,
         entryFee: currentTour.category === 'paid' ? tourEntryFee.trim() : '',
         entryFeeAmount: currentTour.category === 'paid' ? Number(tourEntryFee) || 0 : 0,
+        prizePool: tourPrizePool.trim(),
+        roomId: tourRoomId.trim(),
         status: !tourUnlimitedTeams && updatedCapacity <= currentTour.registeredCount && tourStatus === 'open' ? 'closed' : tourStatus,
         cardImageUrl: tourCardImage.trim(),
       });
@@ -489,6 +499,8 @@ export const AdminPanelModal: React.FC<Props> = ({
         category: newTourCategory,
         entryFee: newTourCategory === 'paid' ? newTourEntryFee.trim() : '',
         entryFeeAmount: newTourCategory === 'paid' ? Number(newTourEntryFee) || 0 : 0,
+        prizePool: newTourPrizePool.trim(),
+        roomId: newTourRoomId.trim(),
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
         maxTeams: newTourGroupsEnabled ? newTourGroupCount * newTourTeamsPerGroup : Number(newTourMax) || 12,
@@ -507,6 +519,8 @@ export const AdminPanelModal: React.FC<Props> = ({
       setShowCreateTour(false);
       setNewTourName('');
       setNewTourEntryFee('');
+      setNewTourPrizePool('');
+      setNewTourRoomId('');
       setNewTourGroupLink('');
       setNewTourCardImage('');
       setNewTourCardImageName('');
@@ -1475,6 +1489,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </div>
                   )}
 
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block text-xs font-semibold text-gray-400">Prize Pool<input type="text" maxLength={60} value={tourPrizePool} onChange={(event) => setTourPrizePool(event.target.value)} placeholder="e.g. ৳10,000" className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"/></label>
+                    <label className="block text-xs font-semibold text-gray-400">Room ID<input type="text" maxLength={40} value={tourRoomId} onChange={(event) => setTourRoomId(event.target.value)} placeholder="Enter room ID (optional)" className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"/></label>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">
                       Square Card Background Image URL
@@ -1746,6 +1765,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <input type="number" required min="1" step="1" value={newTourEntryFee} onChange={(event) => setNewTourEntryFee(event.target.value)} placeholder="e.g. 100" className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white" />
                   </div>
                 )}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs text-gray-400">Prize Pool<input type="text" maxLength={60} value={newTourPrizePool} onChange={(event) => setNewTourPrizePool(event.target.value)} placeholder="e.g. ৳10,000" className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2.5 text-xs text-white outline-none focus:border-amber-300/40"/></label>
+                  <label className="block text-xs text-gray-400">Room ID<input type="text" maxLength={40} value={newTourRoomId} onChange={(event) => setNewTourRoomId(event.target.value)} placeholder="Optional" className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-300/40"/></label>
+                </div>
 
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">CG Group Invite Link</label>
