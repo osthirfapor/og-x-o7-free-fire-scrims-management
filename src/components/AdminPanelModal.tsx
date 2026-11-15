@@ -29,6 +29,9 @@ import {
   Gamepad2,
   Wallet,
   Search,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sendDiscordEvent } from '../lib/discordEvents';
@@ -55,6 +58,7 @@ import {
   creditTeamWallet,
   subscribeTeamWallets,
   subscribeTeams,
+  subscribeTeamAccountContacts,
   removePublicWhatsAppFromTeamRecords,
 } from '../services/tournamentService';
 
@@ -171,6 +175,8 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   // Logs State
   const [logs, setLogs] = useState<RegistrationLog[]>([]);
+  const [teamContacts, setTeamContacts] = useState<{ id: string; teamName: string; whatsappNumber: string }[]>([]);
+  const [expandedSquadKey, setExpandedSquadKey] = useState<string | null>(null);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
   const [showAdminRegistration, setShowAdminRegistration] = useState(false);
@@ -236,6 +242,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   useEffect(() => {
     if (!isAdmin) {
       setLogs([]);
+      setTeamContacts([]);
       setActivityLogs([]);
       setTeamAccounts([]);
       setTeamWallets([]);
@@ -251,12 +258,14 @@ export const AdminPanelModal: React.FC<Props> = ({
       setLogs(fetchedLogs);
       setLogsError(null);
     }, (error) => setLogsError(error instanceof Error ? error.message : 'Could not load registration logs.'));
+    const unsubContacts = subscribeTeamAccountContacts((items) => setTeamContacts(items));
     const unsubActivity = subscribeAdminActivityLogs((items) => setActivityLogs(items));
     const unsubAccounts = subscribeTeamAccounts((items) => setTeamAccounts(items));
     const unsubWallets = subscribeTeamWallets((items) => setTeamWallets(items));
     const unsubResults = subscribeMatchResults((r) => setResults(r));
     return () => {
       unsubLogs();
+      unsubContacts();
       unsubActivity();
       unsubAccounts();
       unsubWallets();
@@ -610,15 +619,22 @@ export const AdminPanelModal: React.FC<Props> = ({
     ...allRegisteredTeams.filter((team) => team.status === 'approved').map((team) => team.teamName.trim()),
   ].filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const searchedWalletTeamNames = registeredWalletTeamNames.filter((name) => name.toLocaleLowerCase().includes(walletTeamSearch.toLocaleLowerCase().trim()));
-  const registeredSquadMap = new Map<string, { teamName: string; teamLogo?: string; leaderName: string; players: Player[]; status: string; createdAt: string; registrations: { id: string; name: string }[] }>();
   const squadKey = (name: string) => name.trim().toLocaleLowerCase();
-  teamAccounts.forEach((account) => registeredSquadMap.set(squadKey(account.teamName), { teamName: account.teamName, teamLogo: account.teamLogo, leaderName: account.leaderName || '', players: account.players || [], status: account.status, createdAt: account.createdAt, registrations: [] }));
+  const adminPhoneByTeam = new Map<string, string>();
+  teamContacts.forEach((contact) => adminPhoneByTeam.set(squadKey(contact.teamName), contact.whatsappNumber));
+  [...logs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).forEach((log) => {
+    if (log.whatsappNumber) adminPhoneByTeam.set(squadKey(log.teamName), log.whatsappNumber);
+  });
+  const registeredSquadMap = new Map<string, { teamName: string; teamLogo?: string; leaderName: string; players: Player[]; status: string; createdAt: string; whatsappNumber?: string; registrations: { id: string; name: string }[] }>();
+  teamAccounts.forEach((account) => registeredSquadMap.set(squadKey(account.teamName), { teamName: account.teamName, teamLogo: account.teamLogo, leaderName: account.leaderName || '', players: account.players || [], status: account.status, createdAt: account.createdAt, whatsappNumber: adminPhoneByTeam.get(squadKey(account.teamName)), registrations: [] }));
   allRegisteredTeams.forEach((team) => {
     const key = squadKey(team.teamName);
     const existing = registeredSquadMap.get(key);
     const tournament = tournaments.find((item) => item.id === team.tournamentId);
-    if (existing) existing.registrations.push({ id: team.tournamentId, name: tournament?.name || team.tournamentId });
-    else registeredSquadMap.set(key, { teamName: team.teamName, leaderName: team.leaderName || '', players: team.players || [], status: team.status, createdAt: team.createdAt, registrations: [{ id: team.tournamentId, name: tournament?.name || team.tournamentId }] });
+    if (existing) {
+      existing.whatsappNumber = adminPhoneByTeam.get(key) || existing.whatsappNumber;
+      existing.registrations.push({ id: team.tournamentId, name: tournament?.name || team.tournamentId });
+    } else registeredSquadMap.set(key, { teamName: team.teamName, leaderName: team.leaderName || '', players: team.players || [], status: team.status, createdAt: team.createdAt, whatsappNumber: adminPhoneByTeam.get(key) || team.whatsappNumber, registrations: [{ id: team.tournamentId, name: tournament?.name || team.tournamentId }] });
   });
   const registeredSquads = Array.from(registeredSquadMap.values()).sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
   const visibleRegisteredSquads = registeredSquads.filter((squad) => {
@@ -837,7 +853,29 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
                   {squadTournamentFilter && <div className="flex items-center justify-between rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-2 text-[11px] text-cyan-100"><span>Scrim filter: {tournaments.find((item) => item.id === squadTournamentFilter)?.name || 'Selected scrim'}</span><button type="button" onClick={() => setSquadTournamentFilter(null)} className="font-bold hover:text-white">Show all teams</button></div>}
                   {squadDeleteMessage && <div role="status" className="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-[11px] text-slate-200">{squadDeleteMessage}</div>}
-                  {visibleRegisteredSquads.length ? <div className="space-y-3">{visibleRegisteredSquads.map((squad, index) => <article key={squadKey(squad.teamName)} className="wallet-card rounded-2xl border border-white/[.08] bg-[#151720] p-4" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}><div className="flex items-start gap-3"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">{squad.teamLogo ? <img src={squad.teamLogo} alt={`${squad.teamName} logo`} className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-200">{squad.teamName.slice(0, 2).toUpperCase()}</span>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] font-bold tabular-nums text-cyan-200">{String(index + 1).padStart(2, '0')}.</span><h4 className="truncate text-sm font-extrabold text-white">{squad.teamName}</h4><span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-200">{squad.status}</span></div><div className="mt-1 text-[11px] text-slate-400">Captain: <strong className="text-slate-200">{squad.leaderName || '—'}</strong></div><div className="mt-3 flex flex-wrap gap-1.5">{squad.players.map((player) => <span key={`${squadKey(squad.teamName)}-${player.slotIndex}-${player.name}`} className="rounded-lg border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div><div className="mt-3 flex flex-wrap gap-1.5">{squad.registrations.map((registration) => <span key={`${registration.id}-${squadKey(squad.teamName)}`} className="rounded-full border border-indigo-300/15 bg-indigo-300/[.06] px-2 py-1 text-[9px] text-indigo-100">{registration.name}</span>)}{!squad.registrations.length && <span className="text-[10px] text-slate-500">No scrim registration yet</span>}</div></div><button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => void handleDeleteSquadEverywhere(squad)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-300/15 bg-rose-300/[.06] px-2.5 py-2 text-[10px] font-bold text-rose-200 transition hover:bg-rose-300/[.12] disabled:opacity-50"><Trash2 size={13}/>{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete everywhere'}</button></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this filter.' : 'Registered teams will appear here as soon as a squad account or scrim entry exists.'}</div>}
+                  {visibleRegisteredSquads.length ? <div className="space-y-2">{visibleRegisteredSquads.map((squad, index) => {
+                    const key = squadKey(squad.teamName);
+                    const expanded = expandedSquadKey === key;
+                    const whatsappHref = squad.whatsappNumber
+                      ? `https://wa.me/${squad.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(`Assalamu alaikum ${squad.teamName}! ${squad.registrations.length ? `Tournament(s): ${squad.registrations.map((registration) => registration.name).join(', ')}. ` : ''}Players: ${squad.players.map((player) => player.name).join(', ')}.`)}`
+                      : undefined;
+                    return <article key={key} className="wallet-card overflow-hidden rounded-xl border border-white/[.08] bg-[#151720]" style={{ animationDelay: `${Math.min(index, 10) * 35}ms` }}>
+                      <div className="flex items-center gap-2.5 px-3 py-2">
+                        <button type="button" onClick={() => setExpandedSquadKey(expanded ? null : key)} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-2.5 text-left hover:opacity-90">
+                          <span className="text-[10px] font-bold tabular-nums text-cyan-200">{String(index + 1).padStart(2, '0')}.</span>
+                          <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/30">{squad.teamLogo ? <img src={squad.teamLogo} alt="" className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-cyan-200">{squad.teamName.slice(0, 2).toUpperCase()}</span>}</span>
+                          <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-1.5"><strong className="truncate text-xs font-extrabold text-white">{squad.teamName}</strong><span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-emerald-200">{squad.status}</span></span><span className="mt-0.5 block truncate text-[10px] text-slate-400">Captain: <b className="text-slate-200">{squad.leaderName || '—'}</b>{squad.whatsappNumber && <span className="ml-2 text-emerald-200">{squad.whatsappNumber}</span>}</span></span>
+                          {expanded ? <ChevronUp size={15} className="shrink-0 text-slate-400"/> : <ChevronDown size={15} className="shrink-0 text-slate-400"/>}
+                        </button>
+                        {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Message ${squad.teamName} on WhatsApp`} title="Send WhatsApp message" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] text-emerald-200 hover:bg-emerald-300/15"><MessageCircle size={15}/></a> : <span title="No WhatsApp number saved" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.06] text-slate-600"><MessageCircle size={14}/></span>}
+                        <button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => void handleDeleteSquadEverywhere(squad)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-300/15 bg-rose-300/[.06] px-2 py-2 text-[9px] font-bold text-rose-200 transition hover:bg-rose-300/[.12] disabled:opacity-50"><Trash2 size={12}/><span className="hidden sm:inline">{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete'}</span></button>
+                      </div>
+                      {expanded && <div className="grid gap-3 border-t border-white/[.07] bg-black/10 px-3 py-3 sm:grid-cols-2">
+                        <div><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Player names</div><div className="flex flex-wrap gap-1">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.role === 'backup' ? 'Backup' : `P${player.slotIndex}`} · {player.name}</span>)}</div></div>
+                        <div><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Tournament registrations</div><div className="flex flex-wrap gap-1">{squad.registrations.map((registration) => <span key={`${registration.id}-${key}`} className="rounded-md border border-indigo-300/15 bg-indigo-300/[.06] px-2 py-1 text-[10px] text-indigo-100">{registration.name}</span>)}{!squad.registrations.length && <span className="text-[10px] text-slate-500">No tournament registrations yet</span>}</div></div>
+                      </div>}
+                    </article>;
+                  })}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this filter.' : 'Registered teams will appear here as soon as a squad account or scrim entry exists.'}</div>}
                 </section>
               )}
 

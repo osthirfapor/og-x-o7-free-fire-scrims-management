@@ -135,6 +135,15 @@ export function subscribeTeamAccounts(onData: (accounts: TeamAccount[]) => void,
   });
 }
 
+export function subscribeTeamAccountContacts(onData: (contacts: { id: string; teamName: string; whatsappNumber: string }[]) => void, onError?: (error: unknown) => void) {
+  return onSnapshot(collection(db, 'team_account_contacts'), (snapshot) => {
+    onData(snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as { teamName: string; whatsappNumber: string }) })));
+  }, (error) => {
+    onError?.(error);
+    handleFirestoreError(error, OperationType.GET, 'team_account_contacts');
+  });
+}
+
 export async function updateTeamAccountStatus(accountId: string, status: TeamAccount['status']): Promise<void> {
   await updateDoc(doc(db, 'team_accounts', accountId), { status, updatedAt: new Date().toISOString() });
 }
