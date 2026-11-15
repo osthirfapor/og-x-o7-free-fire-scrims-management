@@ -60,9 +60,9 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
           </p>
         </div>
 
-        <div className="mb-5 flex flex-col gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/[.07] p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0"><div className="text-xs font-extrabold text-emerald-200">Join the WhatsApp updates group</div><p className="mt-0.5 text-[10px] leading-4 text-slate-300">Joining is required to receive future tournament updates.</p></div>
-          <a href={tournamentUpdatesGroupUrl} onClick={(event) => { event.preventDefault(); openWhatsAppTab(tournamentUpdatesGroupUrl); }} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#128c58] px-3 py-2 text-[10px] font-extrabold text-white transition hover:bg-[#16a367]"><MessageCircle size={13}/> Join group</a>
+        <div role="note" className="mb-5 flex flex-col gap-2.5 rounded-xl border border-amber-300/30 bg-amber-300/[.08] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">Required</span><div className="text-xs font-extrabold text-white">Must join the WhatsApp group</div></div><p className="mt-1 text-[10px] leading-4 text-slate-300">Join using this link to receive future tournament updates: <span className="font-semibold text-amber-100">JxesDN4y8fB6QT68aygFWr</span></p></div>
+          <a href={tournamentUpdatesGroupUrl} onClick={(event) => { event.preventDefault(); openWhatsAppTab(tournamentUpdatesGroupUrl); }} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#128c58] px-3 py-2 text-[10px] font-extrabold text-white transition hover:bg-[#16a367]"><MessageCircle size={13}/> Join required group</a>
         </div>
 
         {/* Registration ID Banner */}
