@@ -4,9 +4,10 @@ export function normalizeWhatsAppNumber(input: string, country: WhatsAppCountry)
   let digits = input.replace(/\D/g, '');
 
   if (country === 'BD') {
-    if (digits.startsWith('880')) digits = `0${digits.slice(3)}`;
-    if (!/^01[3-9]\d{8}$/.test(digits)) return null;
-    return `+880${digits.slice(1)}`;
+    if (digits.startsWith('880')) digits = digits.slice(3);
+    if (digits.startsWith('0')) digits = digits.slice(1);
+    if (!/^1[3-9]\d{8}$/.test(digits)) return null;
+    return `+880${digits}`;
   }
 
   if (digits.startsWith('977')) digits = digits.slice(3);
