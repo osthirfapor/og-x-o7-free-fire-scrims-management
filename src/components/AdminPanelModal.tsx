@@ -327,6 +327,12 @@ export const AdminPanelModal: React.FC<Props> = ({
     setRedirectBtnText(tour.redirectButtonText || 'Join Scrims Group');
   };
 
+  const openTournamentTeams = (tour: Tournament) => {
+    handleSelectTournament(tour);
+    setSquadTournamentFilter(tour.id);
+    setTab('squads');
+  };
+
   const buildRegistrationLink = (tournamentId: string) => {
     const url = new URL(window.location.href);
     url.searchParams.delete('panel');
@@ -636,7 +642,7 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (existing) {
       existing.whatsappNumber = adminPhoneByTeam.get(key) || existing.whatsappNumber;
       existing.registrations.push({ id: team.tournamentId, name: tournament?.name || team.tournamentId });
-    } else registeredSquadMap.set(key, { teamName: team.teamName, leaderName: team.leaderName || '', players: team.players || [], status: team.status, createdAt: team.createdAt, whatsappNumber: adminPhoneByTeam.get(key) || team.whatsappNumber, registrations: [{ id: team.tournamentId, name: tournament?.name || team.tournamentId }] });
+    } else registeredSquadMap.set(key, { teamName: team.teamName, teamLogo: team.teamLogo, leaderName: team.leaderName || '', players: team.players || [], status: team.status, createdAt: team.createdAt, whatsappNumber: adminPhoneByTeam.get(key) || team.whatsappNumber, registrations: [{ id: team.tournamentId, name: tournament?.name || team.tournamentId }] });
   });
   const registeredSquads = Array.from(registeredSquadMap.values()).sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
   const visibleRegisteredSquads = registeredSquads.filter((squad) => {
@@ -777,7 +783,6 @@ export const AdminPanelModal: React.FC<Props> = ({
                 {[
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                   { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
-                  { id: 'squads', label: `Registered Teams (${registeredSquads.length})`, icon: Users },
                   { id: 'database', label: `Team Database (${registeredSquads.length})`, icon: Search },
                   { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
@@ -814,11 +819,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                         const selected = tour.id === currentTour.id;
                         const full = tour.registeredCount >= tour.maxTeams;
                         return (
-                          <article key={tour.id} className={`rounded-2xl border p-4 transition-all ${selected ? 'border-orange-300/35 bg-orange-300/[.045] shadow-lg shadow-orange-950/10' : 'border-[#282934] bg-[#15161d] hover:border-white/15'}`}>
+                          <article key={tour.id} onDoubleClick={() => openTournamentTeams(tour)} title="Double-click to view registered teams" className={`cursor-pointer rounded-2xl border p-4 transition-all ${selected ? 'border-orange-300/35 bg-orange-300/[.045] shadow-lg shadow-orange-950/10' : 'border-[#282934] bg-[#15161d] hover:border-white/15'}`}>
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); }} className="truncate text-left text-sm font-bold text-white transition hover:text-orange-100">{tour.name}</button>
+                                  <button type="button" onClick={() => handleSelectTournament(tour)} onDoubleClick={() => openTournamentTeams(tour)} className="truncate text-left text-sm font-bold text-white transition hover:text-orange-100">{tour.name}</button>
                                   {selected && <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-orange-200">Selected</span>}
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
@@ -829,7 +834,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
                                 <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); }} className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] px-3 py-2.5 text-[10px] font-bold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-300/[.1]">Teams · {tour.registeredCount}</button>
-                                <div className="relative">
+                                <div className="relative" onDoubleClick={(event) => event.stopPropagation()}>
                                 <button type="button" aria-label={`Actions for ${tour.name}`} aria-expanded={openScrimMenu === tour.id} onClick={() => setOpenScrimMenu((open) => open === tour.id ? null : tour.id)} className="rounded-xl border border-white/10 bg-white/[.04] p-2.5 text-slate-300 transition hover:border-orange-300/25 hover:bg-orange-300/[.07] hover:text-white"><MoreVertical size={17} /></button>
                                 {openScrimMenu === tour.id && <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl">
                                   <button type="button" onClick={() => { handleSelectTournament(tour); setSquadTournamentFilter(tour.id); setTab('squads'); setOpenScrimMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button>
@@ -900,6 +905,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     return <article key={key} className="overflow-hidden rounded-xl border border-white/[.08] bg-[#151720]">
                       <div className="flex items-center gap-2 px-3 py-2">
                         <button type="button" onClick={() => setExpandedDatabaseTeam(expanded ? null : key)} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                          <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/30">{squad.teamLogo ? <img src={squad.teamLogo} alt="" className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-cyan-200">{squad.teamName.slice(0, 2).toUpperCase()}</span>}</span>
                           <span className="truncate text-xs font-extrabold text-white">{squad.teamName}</span>
                           <span className="text-[10px] text-slate-500">{squad.players.length} players</span>
                           {expanded ? <ChevronUp size={14} className="ml-auto shrink-0 text-slate-400"/> : <ChevronDown size={14} className="ml-auto shrink-0 text-slate-400"/>}
@@ -967,7 +973,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
                     <div className="divide-y divide-[#22232c]">
                       {tournamentsWithSlots.map((t) => (
-                        <div key={t.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                          <div key={t.id} onDoubleClick={() => openTournamentTeams(t)} title="Double-click to view registered teams" className="cursor-pointer py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
                             <div className="font-bold text-white text-sm">{t.name}</div>
                             <div className="text-gray-400 mt-0.5">
@@ -987,7 +993,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <span className="font-bold text-white">
                               {t.registeredCount} / {t.maxTeams} Teams
                             </span>
-                            <div className="relative"><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { handleSelectTournament(t); setSquadTournamentFilter(t.id); setTab('squads'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
+                            <div className="relative" onDoubleClick={(event) => event.stopPropagation()}><button type="button" aria-label={`Actions for ${t.name}`} aria-expanded={openOverviewTourMenu === t.id} onClick={() => setOpenOverviewTourMenu((open) => open === t.id ? null : t.id)} className="rounded-lg border border-white/10 bg-white/[.04] p-2 text-slate-300 hover:text-white"><MoreVertical size={15} /></button>{openOverviewTourMenu === t.id && <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => { openTournamentTeams(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.06]">View registered teams</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('tournament'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit tournament info</button><button type="button" onClick={() => { handleSelectTournament(t); setTab('redirect'); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">Edit CG Group link</button><button type="button" onClick={() => { void copyRegistrationLink(t.id); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-indigo-200 hover:bg-indigo-300/[.08]">{copiedRegistrationLink === t.id ? 'Link copied' : 'Copy registration link'}</button><button type="button" onClick={() => { void handleToggleRegistration(t); setOpenOverviewTourMenu(null); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-slate-300 hover:bg-white/[.06]">{t.status === 'open' ? 'Close registration' : 'Open registration'}</button><div className="my-1 border-t border-white/[.07]"/><button type="button" onClick={() => { setOpenOverviewTourMenu(null); void handleDeleteTournament(t.id); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08]">Delete tournament</button></div>}</div>
                           </div>
                         </div>
                       ))}
