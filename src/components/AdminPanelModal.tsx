@@ -136,6 +136,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [tourStatus, setTourStatus] = useState(currentTour.status);
   const [tourGroupsEnabled, setTourGroupsEnabled] = useState(currentTour.groupsEnabled === true);
   const [tourUnlimitedTeams, setTourUnlimitedTeams] = useState(currentTour.unlimitedTeams === true);
+  const [tourUnlimitedGroups, setTourUnlimitedGroups] = useState(currentTour.unlimitedGroups === true || (currentTour.unlimitedTeams === true && (!currentTour.groupsEnabled || !currentTour.groupCount)));
   const [tourTeamsPerGroup, setTourTeamsPerGroup] = useState(currentTour.teamsPerGroup || DEFAULT_GROUP_SIZE);
   const [tourGroupCount, setTourGroupCount] = useState(currentTour.groupCount || 1);
   const [tourCardImage, setTourCardImage] = useState(currentTour.cardImageUrl || '');
@@ -162,6 +163,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [newTourMax, setNewTourMax] = useState(12);
   const [newTourGroupsEnabled, setNewTourGroupsEnabled] = useState(false);
   const [newTourUnlimitedTeams, setNewTourUnlimitedTeams] = useState(false);
+  const [newTourUnlimitedGroups, setNewTourUnlimitedGroups] = useState(false);
   const [newTourTeamsPerGroup, setNewTourTeamsPerGroup] = useState(DEFAULT_GROUP_SIZE);
   const [newTourGroupCount, setNewTourGroupCount] = useState(1);
   const [newTourCategory, setNewTourCategory] = useState<'practice' | 'free' | 'paid'>('practice');
@@ -243,8 +245,9 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourPrizePool(activeTournament.prizePool || '');
     setTourRoomId(activeTournament.roomId || '');
     setTourStatus(activeTournament.status);
-    setTourGroupsEnabled(activeTournament.groupsEnabled === true);
+    setTourGroupsEnabled(activeTournament.groupsEnabled === true || activeTournament.unlimitedTeams === true);
     setTourUnlimitedTeams(activeTournament.unlimitedTeams === true);
+    setTourUnlimitedGroups(activeTournament.unlimitedGroups === true || (activeTournament.unlimitedTeams === true && (!activeTournament.groupsEnabled || !activeTournament.groupCount)));
     setTourTeamsPerGroup(activeTournament.teamsPerGroup || DEFAULT_GROUP_SIZE);
     setTourGroupCount(activeTournament.groupCount || 1);
     setTourCardImage(activeTournament.cardImageUrl || '');
@@ -335,8 +338,9 @@ export const AdminPanelModal: React.FC<Props> = ({
     setTourPrizePool(tour.prizePool || '');
     setTourRoomId(tour.roomId || '');
     setTourStatus(tour.status);
-    setTourGroupsEnabled(tour.groupsEnabled === true);
+    setTourGroupsEnabled(tour.groupsEnabled === true || tour.unlimitedTeams === true);
     setTourUnlimitedTeams(tour.unlimitedTeams === true);
+    setTourUnlimitedGroups(tour.unlimitedGroups === true || (tour.unlimitedTeams === true && (!tour.groupsEnabled || !tour.groupCount)));
     setTourTeamsPerGroup(tour.teamsPerGroup || DEFAULT_GROUP_SIZE);
     setTourGroupCount(tour.groupCount || 1);
     setTourCardImage(tour.cardImageUrl || '');
@@ -426,8 +430,9 @@ export const AdminPanelModal: React.FC<Props> = ({
   const handleSaveTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const updatedCapacity = tourUnlimitedTeams ? 2147483647 : tourGroupsEnabled ? tourGroupCount * tourTeamsPerGroup : Number(tourMaxTeams);
-      if (!Number.isSafeInteger(updatedCapacity) || updatedCapacity < 1 || (!tourUnlimitedTeams && updatedCapacity < currentTour.registeredCount)) {
+      const hasUnlimitedCapacity = tourUnlimitedTeams || tourUnlimitedGroups;
+      const updatedCapacity = hasUnlimitedCapacity ? 2147483647 : tourGroupsEnabled ? tourGroupCount * tourTeamsPerGroup : Number(tourMaxTeams);
+      if (!Number.isSafeInteger(updatedCapacity) || updatedCapacity < 1 || (!hasUnlimitedCapacity && updatedCapacity < currentTour.registeredCount)) {
         alert(`Capacity must be at least the ${currentTour.registeredCount} teams already registered.`);
         return;
       }
@@ -436,15 +441,16 @@ export const AdminPanelModal: React.FC<Props> = ({
         date: tourDate,
         time: tourTime,
         maxTeams: updatedCapacity,
-        groupsEnabled: tourGroupsEnabled,
-        unlimitedTeams: tourUnlimitedTeams,
-        teamsPerGroup: tourGroupsEnabled ? tourTeamsPerGroup : 0,
-        groupCount: tourGroupsEnabled ? tourGroupCount : 0,
+        groupsEnabled: tourGroupsEnabled || tourUnlimitedGroups,
+        unlimitedTeams: tourUnlimitedTeams || tourUnlimitedGroups,
+        unlimitedGroups: tourUnlimitedGroups,
+        teamsPerGroup: tourGroupsEnabled || tourUnlimitedGroups ? tourTeamsPerGroup : 0,
+        groupCount: tourGroupsEnabled && !tourUnlimitedGroups ? tourGroupCount : 0,
         entryFee: currentTour.category === 'paid' ? tourEntryFee.trim() : '',
         entryFeeAmount: currentTour.category === 'paid' ? Number(tourEntryFee) || 0 : 0,
         prizePool: tourPrizePool.trim(),
         roomId: tourRoomId.trim(),
-        status: !tourUnlimitedTeams && updatedCapacity <= currentTour.registeredCount && tourStatus === 'open' ? 'closed' : tourStatus,
+        status: !hasUnlimitedCapacity && updatedCapacity <= currentTour.registeredCount && tourStatus === 'open' ? 'closed' : tourStatus,
         cardImageUrl: tourCardImage.trim(),
       });
       recordAdminActivity('tournament_updated', `Updated tournament settings for ${tourName}.`);
@@ -504,9 +510,10 @@ export const AdminPanelModal: React.FC<Props> = ({
         date: newTourDate || new Date().toISOString().split('T')[0],
         time: newTourTime || '18:00 UTC',
         maxTeams: newTourGroupsEnabled ? newTourGroupCount * newTourTeamsPerGroup : Number(newTourMax) || 12,
-        groupsEnabled: newTourGroupsEnabled,
-        unlimitedTeams: newTourUnlimitedTeams,
-        teamsPerGroup: newTourGroupsEnabled ? newTourTeamsPerGroup : 0,
+        groupsEnabled: newTourGroupsEnabled || newTourUnlimitedGroups,
+        unlimitedTeams: newTourUnlimitedTeams || newTourUnlimitedGroups,
+        unlimitedGroups: newTourUnlimitedGroups,
+        teamsPerGroup: newTourGroupsEnabled || newTourUnlimitedGroups ? newTourTeamsPerGroup : 0,
         groupCount: newTourGroupsEnabled ? newTourGroupCount : 0,
         redirectLink: newTourGroupLink.trim(),
         redirectLinkEnabled: Boolean(newTourGroupLink.trim()),
@@ -519,6 +526,9 @@ export const AdminPanelModal: React.FC<Props> = ({
       setShowCreateTour(false);
       setNewTourName('');
       setNewTourEntryFee('');
+      setNewTourGroupsEnabled(false);
+      setNewTourUnlimitedTeams(false);
+      setNewTourUnlimitedGroups(false);
       setNewTourPrizePool('');
       setNewTourRoomId('');
       setNewTourGroupLink('');
@@ -913,7 +923,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase ${full ? 'border-rose-300/20 bg-rose-300/10 text-rose-200' : tour.status === 'open' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-white/10 bg-white/[.04] text-slate-400'}`}>{full ? 'Full' : tour.status}</span>
                                 </div>
                                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                                  <span>{tour.date} · {tour.time}</span><span>{tour.registeredCount}/{tour.unlimitedTeams ? '∞' : tour.maxTeams} teams{tour.groupsEnabled ? ` · ${tour.groupCount} groups × ${tour.teamsPerGroup}` : ''}</span>
+                                  <span>{tour.date} · {tour.time}</span><span>{tour.registeredCount}/{tour.unlimitedTeams ? '∞' : tour.maxTeams} teams{tour.groupsEnabled ? (tour.unlimitedGroups ? ` · Unlimited groups × ${tour.teamsPerGroup}` : ` · ${tour.groupCount} groups × ${tour.teamsPerGroup}`) : ''}</span>
                                   {tour.category === 'paid' && tour.entryFee && <span className="font-bold text-amber-200">৳{Number(tour.entryFee).toLocaleString()} / team</span>}
                                 </div>
                               </div>
@@ -1458,12 +1468,14 @@ export const AdminPanelModal: React.FC<Props> = ({
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      {tourGroupsEnabled ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Group Capacity</label><div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3.5 py-2 text-sm font-mono text-cyan-100">{tourGroupCount * tourTeamsPerGroup} teams total</div></> : tourUnlimitedTeams ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Capacity</label><div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[.04] px-3.5 py-2 text-sm text-emerald-100">Unlimited teams</div></> : <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Max Teams (Capacity)</label><input type="number" min="1" max="10000" value={tourMaxTeams} onChange={(e) => setTourMaxTeams(Math.max(1, Number(e.target.value) || 1))} className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"/></>}
+                      {tourGroupsEnabled && !tourUnlimitedGroups ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Group Capacity</label><div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3.5 py-2 text-sm font-mono text-cyan-100">{tourGroupCount * tourTeamsPerGroup} teams total</div></> : tourUnlimitedGroups || tourUnlimitedTeams ? <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Capacity</label><div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[.04] px-3.5 py-2 text-sm text-emerald-100">{tourUnlimitedGroups ? 'Unlimited groups' : 'Unlimited teams'}</div></> : <><label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Max Teams (Capacity)</label><input type="number" min="1" max="10000" value={tourMaxTeams} onChange={(e) => setTourMaxTeams(Math.max(1, Number(e.target.value) || 1))} className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"/> </>}
                     </div>
 
                     <div className="col-span-3 rounded-xl border border-white/[.08] bg-white/[.025] p-3">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={tourGroupsEnabled} onChange={(event) => { setTourGroupsEnabled(event.target.checked); if (event.target.checked) setTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
-                      {tourGroupsEnabled ? <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={tourGroupCount} onChange={(event) => setTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={tourTeamsPerGroup} onChange={(event) => setTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Capacity: {tourGroupCount * tourTeamsPerGroup} teams · registrations close automatically when full.</p></div> : <><label className="mt-2 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={tourUnlimitedTeams} onChange={(event) => setTourUnlimitedTeams(event.target.checked)} className="accent-emerald-500"/> Unlimited teams (registration closes manually)</label><p className="mt-1 text-[10px] text-gray-500">Group assignment is off unless selected above.</p></>}
+                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={tourGroupsEnabled && !tourUnlimitedGroups} onChange={(event) => { setTourGroupsEnabled(event.target.checked); setTourUnlimitedGroups(false); setTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
+                      {tourGroupsEnabled && !tourUnlimitedGroups && <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={tourGroupCount} onChange={(event) => setTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={tourTeamsPerGroup} onChange={(event) => setTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Capacity: {tourGroupCount * tourTeamsPerGroup} teams · registrations close automatically when full.</p></div>}
+                      <label className="mt-2 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={tourUnlimitedGroups} onChange={(event) => { setTourUnlimitedGroups(event.target.checked); setTourGroupsEnabled(event.target.checked); setTourUnlimitedTeams(event.target.checked); }} className="accent-emerald-500"/> Unlimited groups (registration closes manually)</label>
+                      {tourUnlimitedGroups && <div className="mt-3"><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={tourTeamsPerGroup} onChange={(event) => setTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-sm text-white"/></label><p className="mt-1 text-[10px] text-cyan-200">Unlimited groups · {tourTeamsPerGroup} teams per group.</p></div>}
                     </div>
 
                     <div>
@@ -1742,8 +1754,11 @@ export const AdminPanelModal: React.FC<Props> = ({
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/[.08] bg-white/[.025] p-3">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={newTourGroupsEnabled} onChange={(event) => { setNewTourGroupsEnabled(event.target.checked); if (event.target.checked) setNewTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
-                  {newTourGroupsEnabled ? <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={newTourGroupCount} onChange={(event) => setNewTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={newTourTeamsPerGroup} onChange={(event) => setNewTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Total capacity: {newTourGroupCount * newTourTeamsPerGroup} teams; registration closes when all groups fill.</p></div> : <><label className="mt-3 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={newTourUnlimitedTeams} onChange={(event) => setNewTourUnlimitedTeams(event.target.checked)} className="accent-emerald-500"/> Unlimited teams (registration closes manually)</label>{!newTourUnlimitedTeams && <label className="mt-2 block text-xs text-gray-400">Max Teams<input type="number" min="1" max="10000" value={newTourMax} onChange={(event) => setNewTourMax(Math.max(1, Number(event.target.value) || 1))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label>}</>}
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-200"><input type="checkbox" checked={newTourGroupsEnabled && !newTourUnlimitedGroups} onChange={(event) => { setNewTourGroupsEnabled(event.target.checked); setNewTourUnlimitedGroups(false); setNewTourUnlimitedTeams(false); }} className="accent-indigo-500"/> Enable automatic groups</label>
+                  {newTourGroupsEnabled && !newTourUnlimitedGroups && <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-[10px] text-gray-400">Number of groups<input type="number" min="1" max="500" value={newTourGroupCount} onChange={(event) => setNewTourGroupCount(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={newTourTeamsPerGroup} onChange={(event) => setNewTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><p className="col-span-2 text-[10px] text-cyan-200">Total capacity: {newTourGroupCount * newTourTeamsPerGroup} teams; registration closes when all groups fill.</p></div>}
+                  <label className="mt-3 flex items-center gap-2 text-[10px] text-gray-300"><input type="checkbox" checked={newTourUnlimitedGroups} onChange={(event) => { setNewTourUnlimitedGroups(event.target.checked); setNewTourGroupsEnabled(event.target.checked); setNewTourUnlimitedTeams(event.target.checked); }} className="accent-emerald-500"/> Unlimited groups (registration closes manually)</label>
+                  {newTourUnlimitedGroups && <div className="mt-3"><label className="text-[10px] text-gray-400">Teams per group<input type="number" min="1" max="500" value={newTourTeamsPerGroup} onChange={(event) => setNewTourTeamsPerGroup(Math.min(500, Math.max(1, Number(event.target.value) || 1)))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label><p className="mt-1 text-[10px] text-cyan-200">Unlimited groups · {newTourTeamsPerGroup} teams per group.</p></div>}
+                  {!newTourGroupsEnabled && !newTourUnlimitedGroups && <label className="mt-3 block text-xs text-gray-400">Max Teams<input type="number" min="1" max="10000" value={newTourMax} onChange={(event) => setNewTourMax(Math.max(1, Number(event.target.value) || 1))} className="mt-1 w-full rounded-lg border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white"/></label>}
                 </div>
 
                 <div>

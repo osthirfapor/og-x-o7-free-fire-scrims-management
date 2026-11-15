@@ -70,6 +70,7 @@ export interface Tournament {
   redirectButtonText: string;
   map?: string;
   groupsEnabled?: boolean;
+  unlimitedGroups?: boolean;
   teamsPerGroup?: number;
   groupCount?: number;
   unlimitedTeams?: boolean;
