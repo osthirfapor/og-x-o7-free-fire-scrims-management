@@ -6,6 +6,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   query,
   where,
@@ -15,7 +16,7 @@ import {
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sendDiscordEvent } from '../lib/discordEvents';
 import { Tournament, Team, TeamAccount, TeamWallet, RegistrationLog, AdminActivityLog, Player, TeamProfile, MatchResult, LeaderboardEntry } from '../types/tournament';
-import { normalizeBangladeshWhatsAppNumber, normalizeWhatsAppNumber } from '../utils/phone';
+import { normalizeWhatsAppNumber } from '../utils/phone';
 
 // Helper to generate unique Registration ID (e.g. OG7-FF-K92X81)
 export function generateRegistrationId(): string {
@@ -84,13 +85,10 @@ export async function isTeamNameBanned(teamName: string): Promise<boolean> {
   return snapshot.exists() && snapshot.data().enabled === true;
 }
 
-export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; whatsappNumber: string; players: Player[] }): Promise<TeamAccount> {
+export async function createTeamAccount(params: { teamName: string; teamLogo: string; leaderName: string; players: Player[] }): Promise<TeamAccount> {
   const teamName = params.teamName.trim();
   const leaderName = params.leaderName.trim();
   if (!teamName || !leaderName || !params.teamLogo.trim()) throw new Error('Complete your team name, captain IGN, and logo.');
-  const normalizedWhatsAppNumber = normalizeWhatsAppNumber(params.whatsappNumber, 'BD')
-    || normalizeWhatsAppNumber(params.whatsappNumber, 'NP');
-  if (!normalizedWhatsAppNumber || normalizedWhatsAppNumber !== params.whatsappNumber) throw new Error('Enter a valid Bangladesh or Nepal WhatsApp number.');
   if (params.players.length < 4 || params.players.length > 5 || params.players.slice(0, 4).some((player) => !player.name.trim())) throw new Error('Add all four main players.');
   if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registration. Contact the organizer.');
   const normalizedTeam = teamName.toLocaleLowerCase();
@@ -112,14 +110,7 @@ export async function createTeamAccount(params: { teamName: string; teamLogo: st
     createdAt: now,
     updatedAt: now,
   };
-  const batch = writeBatch(db);
-  batch.set(doc(db, 'team_accounts', id), account);
-  batch.set(doc(db, 'team_account_contacts', id), {
-    teamName,
-    whatsappNumber: normalizedWhatsAppNumber,
-    createdAt: now,
-  });
-  await batch.commit();
+  await setDoc(doc(db, 'team_accounts', id), account);
   void sendDiscordEvent('team_account_created', {
     'Team name': account.teamName,
     'Captain IGN': account.leaderName,
@@ -225,7 +216,9 @@ export async function registerTeam(params: {
 
   // Basic validation
   if (!teamName.trim()) throw new Error('Enter a team name.');
-  if (!normalizeBangladeshWhatsAppNumber(whatsappNumber)) throw new Error('Enter a valid Bangladesh WhatsApp number.');
+  const normalizedWhatsAppNumber = normalizeWhatsAppNumber(whatsappNumber, 'BD')
+    || normalizeWhatsAppNumber(whatsappNumber, 'NP');
+  if (!normalizedWhatsAppNumber || normalizedWhatsAppNumber !== whatsappNumber) throw new Error('Enter a valid Bangladesh or Nepal WhatsApp number.');
   if (await isTeamNameBanned(teamName)) throw new Error('This team is banned from registering. Contact the organizer.');
   if (!teamLogo?.trim()) throw new Error('Upload a team logo image.');
   const isUploadedLogo = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(teamLogo);
@@ -334,7 +327,6 @@ export async function registerTeam(params: {
       teamName: teamName.trim(),
       teamLogo: teamLogo?.trim() || '',
       leaderName: leaderName.trim(),
-      whatsappNumber: normalizeBangladeshWhatsAppNumber(whatsappNumber)!,
       players: players.map((p) => ({
         name: p.name.trim(),
         role: p.role,
@@ -412,7 +404,7 @@ export async function registerTeam(params: {
       registrationId,
       teamName: resultTeam.newTeam.teamName,
       leaderName: resultTeam.newTeam.leaderName,
-      whatsappNumber,
+      whatsappNumber: normalizedWhatsAppNumber,
       playerCount: cleanPlayerNames.length,
       registeredCount: resultTeam.nextCount,
       remainingSlots: resultTeam.remainingSlots,
@@ -424,7 +416,7 @@ export async function registerTeam(params: {
     console.warn('Could not write audit log:', e);
   }
 
-  return { team: resultTeam.newTeam, registrationId };
+  return { team: { ...resultTeam.newTeam, whatsappNumber: normalizedWhatsAppNumber }, registrationId };
 }
 
 // 4. Admin: Create a new Tournament
@@ -788,23 +780,13 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
     .find((account) => (account.status === 'approved' || account.status === 'pending')
       && account.teamName.trim().toLocaleLowerCase() === normalizedTeam
       && account.leaderName.trim().toLocaleLowerCase() === normalizedLeader);
-  if (activeAccount) {
-    return {
-      userId: activeAccount.id,
-      teamName: activeAccount.teamName,
-      teamLogo: activeAccount.teamLogo,
-      leaderName: activeAccount.leaderName,
-      players: activeAccount.players,
-      updatedAt: activeAccount.updatedAt,
-    };
-  }
   const tournamentSnapshot = await getDocs(collection(db, 'tournaments'));
   const tournamentTeamSnapshots = await Promise.all(
     tournamentSnapshot.docs.map((tournamentDoc) => getDocs(collection(db, 'tournaments', tournamentDoc.id, 'teams')))
   );
   let registered: Team | undefined;
   for (const teamsSnapshot of tournamentTeamSnapshots) {
-    registered = teamsSnapshot.docs
+    const matched = teamsSnapshot.docs
       .map((teamDoc) => ({ id: teamDoc.id, ...(teamDoc.data() as Omit<Team, 'id'>) }))
       .find((team) => {
         const leaderIgn = team.players?.find((player) => player.role === 'main' && player.slotIndex === 1)?.name || team.leaderName;
@@ -812,19 +794,36 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
           && team.teamName.trim().toLocaleLowerCase() === normalizedTeam
           && leaderIgn.trim().toLocaleLowerCase() === normalizedLeader;
       });
-    if (registered) break;
+    if (matched && (!registered || new Date(matched.createdAt).getTime() > new Date(registered.createdAt).getTime())) registered = matched;
   }
 
-  if (!registered) return null;
+  if (!registered && !activeAccount) return null;
   return {
-    userId: `${registered.tournamentId}_${registered.id}`,
-    registrationId: registered.registrationId,
-    teamName: registered.teamName,
-    teamLogo: registered.teamLogo || '',
-    leaderName: registered.leaderName,
-    players: registered.players || [],
-    updatedAt: new Date().toISOString(),
+    userId: registered ? `${registered.tournamentId}_${registered.id}` : activeAccount!.id,
+    registrationId: registered?.registrationId,
+    teamName: registered?.teamName || activeAccount!.teamName,
+    teamLogo: registered?.teamLogo || activeAccount?.teamLogo || '',
+    leaderName: registered?.leaderName || activeAccount!.leaderName,
+    whatsappNumber: getLocalTeamProfile()?.whatsappNumber,
+    players: registered?.players || activeAccount?.players || [],
+    updatedAt: registered?.updatedAt || activeAccount!.updatedAt,
   };
+}
+
+export async function removePublicWhatsAppFromTeamRecords(): Promise<number> {
+  const tournaments = await getDocs(collection(db, 'tournaments'));
+  let removed = 0;
+  for (const tournament of tournaments.docs) {
+    const teams = await getDocs(collection(db, 'tournaments', tournament.id, 'teams'));
+    const withPhone = teams.docs.filter((team) => typeof team.data().whatsappNumber === 'string');
+    for (let start = 0; start < withPhone.length; start += 450) {
+      const batch = writeBatch(db);
+      withPhone.slice(start, start + 450).forEach((team) => batch.update(team.ref, { whatsappNumber: deleteField() }));
+      await batch.commit();
+      removed += Math.min(450, withPhone.length - start);
+    }
+  }
+  return removed;
 }
 
 export async function fetchTeamProfileFromCloud(userId: string): Promise<TeamProfile | null> {

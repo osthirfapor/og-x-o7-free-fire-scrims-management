@@ -147,20 +147,6 @@ export const RegisteredTeamsView: React.FC<Props> = ({
                       <div className="text-xs text-gray-400 mt-0.5">
                         Leader: <span className="text-gray-200 font-semibold">{team.leaderName}</span>
                       </div>
-                      {team.whatsappNumber && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          WhatsApp:{' '}
-                          <a
-                            href={`https://wa.me/${team.whatsappNumber.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => event.stopPropagation()}
-                            className="font-semibold text-emerald-300 hover:underline"
-                          >
-                            {team.whatsappNumber}
-                          </a>
-                        </div>
-                      )}
                     </div>
                   </div>
 

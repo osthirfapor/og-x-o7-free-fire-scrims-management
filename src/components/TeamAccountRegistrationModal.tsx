@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AlertCircle, Check, Gamepad2, LoaderCircle, Plus, Upload, X } from 'lucide-react';
 import { Player, TeamAccount } from '../types/tournament';
 import { createTeamAccount } from '../services/tournamentService';
-import { normalizeWhatsAppNumber, type WhatsAppCountry } from '../utils/phone';
 
 interface Props {
   onSuccess: (account: TeamAccount) => void;
@@ -11,8 +10,6 @@ interface Props {
 
 export const TeamAccountRegistrationModal: React.FC<Props> = ({ onSuccess, onClose }) => {
   const [teamName, setTeamName] = useState('');
-  const [whatsappCountry, setWhatsappCountry] = useState<WhatsAppCountry>('BD');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [logo, setLogo] = useState('');
   const [logoName, setLogoName] = useState('');
   const [players, setPlayers] = useState<Player[]>([
@@ -59,15 +56,13 @@ export const TeamAccountRegistrationModal: React.FC<Props> = ({ onSuccess, onClo
     setError('');
     const submitted = showBackup && players[4].name.trim() ? players : players.slice(0, 4);
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
-    const normalizedWhatsAppNumber = normalizeWhatsAppNumber(whatsappNumber, whatsappCountry);
-    if (!normalizedWhatsAppNumber) { setError(whatsappCountry === 'BD' ? 'Enter a valid Bangladesh mobile number.' : 'Enter a valid Nepal mobile number.'); return; }
     if (!logo) { setError('Upload your team logo.'); return; }
     if (!acceptPaidTerms) { setError('Please confirm the paid tournament wallet requirement.'); return; }
     if (submitted.some((player) => !player.name.trim())) { setError('Enter all four player IGNs.'); return; }
     if (new Set(submitted.map((player) => player.name.trim().toLocaleLowerCase())).size !== submitted.length) { setError('Each player must have a different IGN.'); return; }
     setLoading(true);
     try {
-      const account = await createTeamAccount({ teamName: teamName.trim(), teamLogo: logo, leaderName: submitted[0].name.trim(), whatsappNumber: normalizedWhatsAppNumber, players: submitted });
+      const account = await createTeamAccount({ teamName: teamName.trim(), teamLogo: logo, leaderName: submitted[0].name.trim(), players: submitted });
       onSuccess(account);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not send your team request. Try again.');
@@ -84,7 +79,6 @@ export const TeamAccountRegistrationModal: React.FC<Props> = ({ onSuccess, onClo
         <form onSubmit={submit} className="space-y-4 px-5 py-5 sm:px-7">
           <p className="text-xs leading-5 text-slate-400">Create your squad once, then sign in to browse and join tournaments.</p>
           <label className="block space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Team name</span><input required maxLength={50} value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="Enter your team name" className="registration-input w-full rounded-xl border border-white/10 bg-[#07080b] px-3.5 py-3 text-sm text-white outline-none focus:border-orange-300/50" /></label>
-          <div className="space-y-1.5"><label htmlFor="team-account-whatsapp" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">WhatsApp number · required</label><div className="flex gap-2"><select aria-label="WhatsApp country code" value={whatsappCountry} onChange={(event) => setWhatsappCountry(event.target.value as WhatsAppCountry)} className="w-[48%] rounded-xl border border-white/10 bg-[#07080b] px-3 py-3 text-xs text-white outline-none focus:border-orange-300/50 sm:w-52"><option value="BD">🇧🇩 Bangladesh (+880)</option><option value="NP">🇳🇵 Nepal (+977)</option></select><input id="team-account-whatsapp" type="tel" autoComplete="tel-national" inputMode="tel" required maxLength={16} value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)} placeholder={whatsappCountry === 'BD' ? '1XXXXXXXXX or 01XXXXXXXXX' : '98XXXXXXXX'} className="registration-input min-w-0 flex-1 rounded-xl border border-white/10 bg-[#07080b] px-3.5 py-3 text-sm text-white outline-none focus:border-orange-300/50" /></div><p className="text-[10px] text-slate-500">Include or omit the leading 0; number is saved privately for organizers.</p></div>
           <div className="space-y-2"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Player IGNs <span className="text-emerald-300">· 4 required</span></div><div className="grid gap-2">
             {players.slice(0, 4).map((player, index) => <label key={player.slotIndex} className="flex items-center gap-2 rounded-xl border border-white/[.07] bg-white/[.025] p-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[.05] text-[10px] font-extrabold text-slate-300">{String(index + 1).padStart(2, '0')}</span><input required maxLength={40} value={player.name} onChange={(event) => updatePlayer(index, event.target.value)} placeholder={index === 0 ? 'Captain IGN' : `Player ${index + 1} IGN`} className="registration-input h-10 min-w-0 flex-1 rounded-lg border border-white/[.08] bg-[#07080b] px-3 text-sm text-white outline-none focus:border-orange-300/50" /></label>)}
           </div></div>

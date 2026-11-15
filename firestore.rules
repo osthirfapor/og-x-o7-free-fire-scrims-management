@@ -41,12 +41,7 @@ service cloud.firestore {
 
     match /team_account_contacts/{accountId} {
       allow get, list: if isAdmin();
-      allow create: if (request.auth == null || isAdmin())
-        && !exists(/databases/$(database)/documents/team_accounts/$(accountId))
-        && existsAfter(/databases/$(database)/documents/team_accounts/$(accountId))
-        && request.resource.data.teamName == getAfter(/databases/$(database)/documents/team_accounts/$(accountId)).data.teamName
-        && request.resource.data.whatsappNumber is string
-        && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$|^\\+9779[6-8][0-9]{8}$');
+      allow create: if isAdmin();
       allow update, delete: if isAdmin();
     }
 
@@ -104,8 +99,7 @@ service cloud.firestore {
           && request.resource.data.teamLogo is string
           && request.resource.data.teamLogo.size() > 0
           && request.resource.data.registrationId is string
-          && request.resource.data.whatsappNumber is string
-          && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$')
+          && !request.resource.data.keys().hasAny(['whatsappNumber'])
           && request.resource.data.players is list
           && request.resource.data.players.size() >= 4
           && request.resource.data.players.size() <= 5

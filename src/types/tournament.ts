@@ -12,6 +12,7 @@ export interface TeamProfile {
   teamName: string;
   teamLogo: string;
   leaderName: string;
+  whatsappNumber?: string;
   players: Player[]; // 4 Main + 1 Backup
   updatedAt: string;
 }

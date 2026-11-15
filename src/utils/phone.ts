@@ -1,5 +1,18 @@
 export type WhatsAppCountry = 'BD' | 'NP';
 
+export function getWhatsAppCountry(number?: string): WhatsAppCountry {
+  return number?.startsWith('+977') ? 'NP' : 'BD';
+}
+
+export function getLocalWhatsAppNumber(number: string | undefined, country: WhatsAppCountry): string {
+  if (!number) return '';
+  const digits = number.replace(/\D/g, '');
+  const countryPrefix = country === 'BD' ? '880' : '977';
+  if (!digits.startsWith(countryPrefix)) return number;
+  const nationalNumber = digits.slice(countryPrefix.length);
+  return country === 'BD' ? `0${nationalNumber}` : nationalNumber;
+}
+
 export function normalizeWhatsAppNumber(input: string, country: WhatsAppCountry): string | null {
   let digits = input.replace(/\D/g, '');
 

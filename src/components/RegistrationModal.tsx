@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { AlertCircle, Check, Gamepad2, LoaderCircle, Plus, ShieldCheck, UserRoundPlus, X } from 'lucide-react';
 import { Tournament, Team, Player } from '../types/tournament';
 import { registerTeam, getLocalTeamProfile } from '../services/tournamentService';
-import { normalizeBangladeshWhatsAppNumber } from '../utils/phone';
+import { getLocalWhatsAppNumber, getWhatsAppCountry, normalizeWhatsAppNumber } from '../utils/phone';
+import type { WhatsAppCountry } from '../utils/phone';
 
 interface Props {
   tournament: Tournament;
@@ -14,7 +15,9 @@ interface Props {
 export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onClose, walletBalance }) => {
   const savedProfile = getLocalTeamProfile();
   const [teamName, setTeamName] = useState(savedProfile?.teamName || '');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [whatsappCountry, setWhatsappCountry] = useState<WhatsAppCountry>(getWhatsAppCountry(savedProfile?.whatsappNumber));
+  const [whatsappNumber, setWhatsappNumber] = useState(getLocalWhatsAppNumber(savedProfile?.whatsappNumber, getWhatsAppCountry(savedProfile?.whatsappNumber)));
+  const [editingWhatsApp, setEditingWhatsApp] = useState(!savedProfile?.whatsappNumber);
   const [teamLogo, setTeamLogo] = useState(savedProfile?.teamLogo || '');
   const [logoImageReady, setLogoImageReady] = useState(Boolean(savedProfile?.teamLogo));
   const [logoName, setLogoName] = useState(savedProfile?.teamLogo ? 'Saved team logo' : '');
@@ -80,8 +83,8 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
     setError(null);
     if (isUnavailable) { setError('Registration is currently closed.'); return; }
     if (!teamName.trim()) { setError('Enter your team name.'); return; }
-    const normalizedWhatsAppNumber = normalizeBangladeshWhatsAppNumber(whatsappNumber);
-    if (!normalizedWhatsAppNumber) { setError('Enter a valid Bangladesh WhatsApp number, such as 01XXXXXXXXX.'); return; }
+    const normalizedWhatsAppNumber = normalizeWhatsAppNumber(whatsappNumber, whatsappCountry);
+    if (!normalizedWhatsAppNumber) { setError(`Enter a valid ${whatsappCountry === 'BD' ? 'Bangladesh' : 'Nepal'} WhatsApp number.`); return; }
     if (!teamLogo.trim()) { setError('Upload your team logo.'); return; }
     if (!logoImageReady) { setError('Wait for the team logo preview to load.'); return; }
     const starters = players.slice(0, 4);
@@ -158,13 +161,19 @@ export const RegistrationModal: React.FC<Props> = ({ tournament, onSuccess, onCl
 
           <div className="space-y-2">
             <label htmlFor="registration-whatsapp" className="block text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">WhatsApp number <span className="text-rose-300">· required</span></label>
-            <input
-              id="registration-whatsapp" type="tel" autoComplete="tel" inputMode="tel" required maxLength={20}
-              value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)}
-              placeholder="01XXXXXXXXX" disabled={isUnavailable}
-              className="registration-input w-full rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
-            />
-            <p className="text-[10px] text-slate-500">Bangladesh number; it will be shown publicly in Registered Teams.</p>
+            <div className="flex gap-2">
+              <select aria-label="WhatsApp country" value={whatsappCountry} disabled={!editingWhatsApp || isUnavailable} onChange={(event) => { setWhatsappCountry(event.target.value as WhatsAppCountry); setWhatsappNumber(''); }} className="registration-input w-[44%] rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-3 py-3.5 text-xs font-semibold text-white outline-none disabled:opacity-60">
+                <option value="BD">🇧🇩 Bangladesh (+880)</option><option value="NP">🇳🇵 Nepal (+977)</option>
+              </select>
+              <input
+                id="registration-whatsapp" type="tel" autoComplete="tel" inputMode="tel" required maxLength={20}
+                value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)}
+                placeholder={whatsappCountry === 'BD' ? '01XXXXXXXXX' : '98XXXXXXXX'} readOnly={!editingWhatsApp} disabled={isUnavailable}
+                className="registration-input min-w-0 flex-1 rounded-2xl border border-white/[.09] bg-[#07080b]/90 px-4 py-3.5 text-sm font-semibold text-white outline-none transition placeholder:font-normal placeholder:text-slate-600 focus:border-indigo-400/60 disabled:opacity-50"
+              />
+              {!editingWhatsApp && <button type="button" disabled={isUnavailable} onClick={() => setEditingWhatsApp(true)} className="rounded-xl border border-white/10 px-3 text-xs font-bold text-cyan-200">Edit</button>}
+            </div>
+            <p className="text-[10px] text-slate-500">Saved privately for organizers; not shown in public Registered Teams.</p>
           </div>
 
           <div className="space-y-2.5">

@@ -55,6 +55,7 @@ import {
   creditTeamWallet,
   subscribeTeamWallets,
   subscribeTeams,
+  removePublicWhatsAppFromTeamRecords,
 } from '../services/tournamentService';
 
 interface Props {
@@ -241,6 +242,10 @@ export const AdminPanelModal: React.FC<Props> = ({
       setResults([]);
       return;
     }
+
+    void removePublicWhatsAppFromTeamRecords().catch((error) => {
+      console.error('Could not remove legacy public WhatsApp fields:', error);
+    });
 
     const unsubLogs = subscribeRegistrationLogs((fetchedLogs) => {
       setLogs(fetchedLogs);

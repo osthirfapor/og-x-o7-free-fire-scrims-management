@@ -426,6 +426,7 @@ function MainApp() {
                 teamName: team.teamName,
                 teamLogo: team.teamLogo || '',
                 leaderName: team.leaderName,
+                whatsappNumber: team.whatsappNumber,
                 players: team.players,
                 updatedAt: new Date().toISOString(),
               };
