@@ -120,7 +120,9 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab State
-  const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'wallets' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'scrims' | 'squads' | 'database' | 'wallets' | 'results' | 'history' | 'tournament' | 'redirect' | 'discord' | 'logs'>('overview');
+  const [databaseTeamSearch, setDatabaseTeamSearch] = useState('');
+  const [expandedDatabaseTeam, setExpandedDatabaseTeam] = useState<string | null>(null);
 
   // Selected Tournament for Admin Action
   const [currentTour, setCurrentTour] = useState<Tournament>(activeTournament);
@@ -643,6 +645,10 @@ export const AdminPanelModal: React.FC<Props> = ({
     const matchesQuery = !query || `${squad.teamName} ${squad.leaderName} ${squad.players.map((player) => player.name).join(' ')} ${squad.registrations.map((registration) => registration.name).join(' ')}`.toLocaleLowerCase().includes(query);
     return matchesTournament && matchesQuery;
   });
+  const visibleDatabaseSquads = registeredSquads.filter((squad) => {
+    const q = databaseTeamSearch.toLocaleLowerCase().trim();
+    return !q || `${squad.teamName} ${squad.players.map((player) => player.name).join(' ')}`.toLocaleLowerCase().includes(q);
+  });
   const handleDeleteSquadEverywhere = async (squad: (typeof registeredSquads)[number]) => {
     if (!confirm(`Permanently delete ${squad.teamName} and its team account, all scrim registrations, match results, registration logs, and wallet balance?`)) return;
     setDeletingSquadName(squad.teamName);
@@ -772,6 +778,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                   { id: 'scrims', label: `Scrims (${activeScrims.length})`, icon: CalendarDays },
                   { id: 'squads', label: `Registered Teams (${registeredSquads.length})`, icon: Users },
+                  { id: 'database', label: `Team Database (${registeredSquads.length})`, icon: Search },
                   { id: 'wallets', label: `Team Wallet (${teamWallets.length})`, icon: Wallet },
                   { id: 'results', label: `Results (${draftTourResults.length})`, icon: Trophy },
                   { id: 'history', label: `Match History (${publishedTourResults.length + completedScrims.length})`, icon: HistoryIcon },
@@ -876,6 +883,32 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </div>}
                     </article>;
                   })}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this filter.' : 'Registered teams will appear here as soon as a squad account or scrim entry exists.'}</div>}
+                </section>
+              )}
+
+              {tab === 'database' && (
+                <section className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Team database</div><h3 className="mt-1 text-lg font-extrabold text-white">All Squads ({registeredSquads.length})</h3><p className="mt-1 text-xs text-slate-400">Open a team to see its player IGNs. WhatsApp numbers are visible to admins only.</p></div>
+                    <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={databaseTeamSearch} onChange={(event) => setDatabaseTeamSearch(event.target.value)} placeholder="Search team or player IGN" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
+                  </div>
+                  {visibleDatabaseSquads.length ? <div className="space-y-2">{visibleDatabaseSquads.map((squad) => {
+                    const key = squadKey(squad.teamName);
+                    const expanded = expandedDatabaseTeam === key;
+                    const message = `Assalamu alaikum ${squad.teamName}! Players: ${squad.players.map((player) => player.name).join(', ')}.`;
+                    const whatsappHref = squad.whatsappNumber ? `https://wa.me/${squad.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}` : undefined;
+                    return <article key={key} className="overflow-hidden rounded-xl border border-white/[.08] bg-[#151720]">
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <button type="button" onClick={() => setExpandedDatabaseTeam(expanded ? null : key)} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                          <span className="truncate text-xs font-extrabold text-white">{squad.teamName}</span>
+                          <span className="text-[10px] text-slate-500">{squad.players.length} players</span>
+                          {expanded ? <ChevronUp size={14} className="ml-auto shrink-0 text-slate-400"/> : <ChevronDown size={14} className="ml-auto shrink-0 text-slate-400"/>}
+                        </button>
+                        {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Message ${squad.teamName} on WhatsApp`} title={`Send WhatsApp message${squad.whatsappNumber ? ` to ${squad.whatsappNumber}` : ''}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/[.07] text-emerald-200 hover:bg-emerald-300/15"><MessageCircle size={15}/></a> : <span title="No WhatsApp number saved" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[.06] text-slate-600"><MessageCircle size={14}/></span>}
+                      </div>
+                      {expanded && <div className="flex flex-wrap gap-1.5 border-t border-white/[.07] bg-black/10 px-3 py-2.5">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.name}</span>)}</div>}
+                    </article>;
+                  })}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this search.' : 'Teams saved in the database will appear here.'}</div>}
                 </section>
               )}
 
