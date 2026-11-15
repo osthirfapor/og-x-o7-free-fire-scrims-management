@@ -1,6 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function hasRecentVerifiedTeamLogin(accountId) {
+      let checkPath = /databases/$(database)/documents/team_login_checks/$(accountId);
+      let contactPath = /databases/$(database)/documents/team_account_contacts/$(accountId);
+      return exists(checkPath)
+        && exists(contactPath)
+        && get(checkPath).data.accountId == accountId
+        && get(checkPath).data.whatsappNumber == get(contactPath).data.whatsappNumber
+        && get(checkPath).data.checkedAt is timestamp
+        && get(checkPath).data.checkedAt > request.time - duration.value(10, 'm');
+    }
     function isAdmin() {
       return request.auth != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
@@ -36,7 +46,20 @@ service cloud.firestore {
         && request.resource.data.players is list
         && request.resource.data.players.size() >= 4
         && request.resource.data.players.size() <= 5;
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.auth == null
+        && hasRecentVerifiedTeamLogin(accountId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamLogo', 'leaderName', 'players', 'updatedAt'])
+        && request.resource.data.teamName == resource.data.teamName
+        && request.resource.data.teamLogo is string
+        && request.resource.data.teamLogo.size() > 0
+        && request.resource.data.teamLogo.size() <= 300000
+        && request.resource.data.players is list
+        && request.resource.data.players.size() >= 4
+        && request.resource.data.players.size() <= 5
+        && request.resource.data.leaderName == request.resource.data.players[0].name
+      );
+      allow delete: if isAdmin();
     }
 
     match /team_account_contacts/{accountId} {
@@ -57,13 +80,15 @@ service cloud.firestore {
       // rules, so the client can verify a match without reading that record.
       allow get, list, delete: if isAdmin();
       allow create, update: if (request.auth == null || isAdmin())
-        && request.resource.data.keys().hasOnly(['accountId', 'whatsappNumber', 'checkedAt'])
+        && request.resource.data.keys().hasOnly(['accountId', 'whatsappNumber', 'checkedAt', 'teamName'])
         && request.resource.data.accountId == accountId
         && exists(/databases/$(database)/documents/team_accounts/$(accountId))
+        && request.resource.data.teamName == get(/databases/$(database)/documents/team_accounts/$(accountId)).data.teamName
         && exists(/databases/$(database)/documents/team_account_contacts/$(accountId))
         && request.resource.data.whatsappNumber is string
         && request.resource.data.whatsappNumber == get(/databases/$(database)/documents/team_account_contacts/$(accountId)).data.whatsappNumber
-        && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$|^\\+9779[6-8][0-9]{8}$');
+        && request.resource.data.whatsappNumber.matches('^\\+8801[3-9][0-9]{8}$|^\\+9779[6-8][0-9]{8}$')
+        && request.resource.data.checkedAt == request.time;
     }
 
     match /team_wallets/{walletId} {

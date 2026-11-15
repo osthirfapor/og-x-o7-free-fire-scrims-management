@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Infinity as InfinityIcon,
   Hash,
+  Edit2,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TeamAccount, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -50,6 +51,7 @@ import { RegistrationModal } from './components/RegistrationModal';
 import { RegistrationSuccessModal } from './components/RegistrationSuccessModal';
 import { TeamLoginGate } from './components/TeamLoginGate';
 import { TeamAccountRegistrationModal } from './components/TeamAccountRegistrationModal';
+import { EditTeamProfileModal } from './components/EditTeamProfileModal';
 import { PlayerSearchView } from './components/PlayerSearchView';
 import { RegisteredTeamsView } from './components/RegisteredTeamsView';
 import { TournamentStandingsView } from './components/TournamentStandingsView';
@@ -149,6 +151,7 @@ function MainApp() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showEditTeamProfile, setShowEditTeamProfile] = useState(false);
   const [showTeamAccountRegistration, setShowTeamAccountRegistration] = useState(false);
   const [newAccountCredentials, setNewAccountCredentials] = useState<{ teamName: string; leaderName: string } | null>(null);
   const [registeredSuccessTeam, setRegisteredSuccessTeam] = useState<Team | null>(null);
@@ -644,6 +647,7 @@ function MainApp() {
               <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#141720] p-2 shadow-2xl shadow-black/50 animate-fade-in">
                 <div className="border-b border-white/[.07] px-3 py-2.5"><div className="truncate text-xs font-extrabold text-white">{teamProfile.teamName}</div><div className="mt-1 truncate text-[10px] text-slate-500">Captain · {teamProfile.leaderName}</div></div>
                 <button role="menuitem" type="button" onClick={() => { setShowProfileMenu(false); setShowWallet(true); }} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-amber-100 transition hover:bg-amber-300/[.08]">Wallet balance <span className="ml-auto text-[10px] text-amber-200/70">৳{walletBalance.toLocaleString()}</span></button>
+                <button role="menuitem" type="button" onClick={() => { setShowProfileMenu(false); setShowEditTeamProfile(true); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/[.08]"><Edit2 size={15} /> Edit team profile</button>
                 <button role="menuitem" type="button" onClick={() => { setShowProfileMenu(false); handleLogoutTeam(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-200 transition hover:bg-rose-300/[.08]"><LogOut size={15} /> Log out</button>
               </div>
             </>}
@@ -960,6 +964,7 @@ function MainApp() {
           </section>
         </div>
       )}
+      {showEditTeamProfile && teamProfile && <EditTeamProfileModal profile={teamProfile} onClose={() => setShowEditTeamProfile(false)} onSaved={(profile) => { void saveTeamProfile(profile); setTeamProfile(profile); setShowEditTeamProfile(false); }} />}
 
       {/* 1. Team Registration Modal (Auto-refilled, No tournament dropdown selector) */}
       {!PUBLIC_READ_ONLY && showRegModal && activeTournament && (

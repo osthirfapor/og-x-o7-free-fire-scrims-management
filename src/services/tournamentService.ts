@@ -12,6 +12,7 @@ import {
   where,
   writeBatch,
   runTransaction,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sendDiscordEvent } from '../lib/discordEvents';
@@ -150,9 +151,23 @@ export async function verifyTeamWhatsAppForLogin(accountId: string, teamName: st
   await setDoc(doc(db, 'team_login_checks', accountId), {
     accountId,
     whatsappNumber,
-    checkedAt: new Date().toISOString(),
+    teamName,
+    checkedAt: serverTimestamp(),
   });
   return whatsappNumber;
+}
+
+export async function saveTeamAccountEdits(accountId: string, teamName: string, whatsappNumber: string, teamLogo: string, players: Player[]): Promise<Pick<TeamProfile, 'teamLogo' | 'leaderName' | 'players'>> {
+  if (!accountId.startsWith('account_')) throw new Error('This legacy profile cannot be edited yet. Contact the organizer to update it.');
+  if (!teamLogo || teamLogo.length > 300_000) throw new Error('Upload a valid team logo image.');
+  const mainPlayers = players.filter((player) => player.role === 'main').sort((a, b) => a.slotIndex - b.slotIndex);
+  if (mainPlayers.length !== 4 || mainPlayers.some((player) => !player.name.trim()) || players.length < 4 || players.length > 5) throw new Error('Add all four main players.');
+  const country = whatsappNumber.startsWith('+977') ? 'NP' : 'BD';
+  await verifyTeamWhatsAppForLogin(accountId, teamName, whatsappNumber, country);
+  const updatedPlayers = players.map((player) => ({ ...player, name: player.name.trim() }));
+  const leaderName = mainPlayers[0].name.trim();
+  await updateDoc(doc(db, 'team_accounts', accountId), { teamLogo, leaderName, players: updatedPlayers, updatedAt: new Date().toISOString() });
+  return { teamLogo, leaderName, players: updatedPlayers };
 }
 
 export async function updateTeamAccountStatus(accountId: string, status: TeamAccount['status']): Promise<void> {
@@ -878,10 +893,10 @@ export async function findRegisteredTeamProfile(teamName: string, leaderName: st
     userId: activeAccount?.id || `${registered!.tournamentId}_${registered!.id}`,
     registrationId: registered?.registrationId,
     teamName: registered?.teamName || activeAccount!.teamName,
-    teamLogo: registered?.teamLogo || activeAccount?.teamLogo || '',
-    leaderName: registered?.leaderName || activeAccount!.leaderName,
+    teamLogo: activeAccount?.teamLogo || registered?.teamLogo || '',
+    leaderName: activeAccount?.leaderName || registered?.leaderName || '',
     whatsappNumber: getLocalTeamProfile()?.whatsappNumber,
-    players: registered?.players || activeAccount?.players || [],
+    players: activeAccount?.players?.length ? activeAccount.players : registered?.players || [],
     updatedAt: registered?.updatedAt || activeAccount!.updatedAt,
   };
 }
