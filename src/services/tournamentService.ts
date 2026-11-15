@@ -758,6 +758,7 @@ export async function addMatchResult(params: {
   tournamentId: string;
   tournamentName: string;
   teamName: string;
+  mapNumber?: number;
   position: number;
   kills: number;
   earnings?: number;
@@ -768,6 +769,7 @@ export async function addMatchResult(params: {
     tournamentId: params.tournamentId,
     tournamentName: params.tournamentName,
     teamName: params.teamName,
+    mapNumber: Math.max(1, Math.floor(Number(params.mapNumber) || 1)),
     position: params.position,
     kills: params.kills,
     points: calcPoints(params.position, params.kills),

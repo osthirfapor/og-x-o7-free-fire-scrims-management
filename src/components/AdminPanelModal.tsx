@@ -228,6 +228,8 @@ export const AdminPanelModal: React.FC<Props> = ({
   // Match Results & Ranking State
   const [results, setResults] = useState<MatchResult[]>([]);
   const [resTeam, setResTeam] = useState('');
+  const [resultsTournamentId, setResultsTournamentId] = useState(activeTournament.id);
+  const [resMapNumber, setResMapNumber] = useState(1);
   const [resPosition, setResPosition] = useState(1);
   const [resKills, setResKills] = useState(0);
   const [resEarnings, setResEarnings] = useState(0);
@@ -237,6 +239,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   // Sync when activeTournament changes
   useEffect(() => {
     setCurrentTour(activeTournament);
+    setResultsTournamentId(activeTournament.id);
     setTourName(activeTournament.name);
     setTourDate(activeTournament.date);
     setTourTime(activeTournament.time);
@@ -329,6 +332,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   // Switch tournament
   const handleSelectTournament = (tour: Tournament) => {
     setCurrentTour(tour);
+    setResultsTournamentId(tour.id);
     onSelectTournament(tour);
     setTourName(tour.name);
     setTourDate(tour.date);
@@ -642,21 +646,30 @@ export const AdminPanelModal: React.FC<Props> = ({
       setResMsg('Age ekta team select korun.');
       return;
     }
+    const selectedResultsTournament = tournaments.find((tournament) => tournament.id === resultsTournamentId) || currentTour;
+    const duplicate = results.some((result) => result.tournamentId === selectedResultsTournament.id
+      && (result.mapNumber || 1) === resMapNumber
+      && result.teamName.trim().toLocaleLowerCase() === resTeam.trim().toLocaleLowerCase());
+    if (duplicate) {
+      setResMsg(`${resTeam} already has a result for Map ${resMapNumber}.`);
+      return;
+    }
     setResSaving(true);
     try {
       await addMatchResult({
-        tournamentId: currentTour.id,
-        tournamentName: currentTour.name,
+        tournamentId: selectedResultsTournament.id,
+        tournamentName: selectedResultsTournament.name,
         teamName: resTeam,
+        mapNumber: resMapNumber,
         position: Number(resPosition),
         kills: Math.max(0, Number(resKills) || 0),
         earnings: Math.max(0, Number(resEarnings) || 0),
       });
-      recordAdminActivity('match_result_added', `Saved rank #${resPosition} for ${resTeam}.`, resTeam);
-      setResMsg(`✅ ${resTeam} — Rank #${resPosition} saved.`);
+      void writeAdminActivityLog({ eventType: 'match_result_added', summary: `Saved Map ${resMapNumber}, rank #${resPosition} for ${resTeam}.`, tournamentId: selectedResultsTournament.id, tournamentName: selectedResultsTournament.name, teamName: resTeam }).catch((error) => console.warn('Could not save admin activity log:', error));
+      setResMsg(`✅ ${resTeam} — Map ${resMapNumber}, rank #${resPosition} saved.`);
       setResKills(0);
       setResEarnings(0);
-      setResPosition((p) => Math.min(12, p + 1));
+      setResPosition(1);
       setResTeam('');
       setTimeout(() => setResMsg(null), 3000);
     } catch (err: any) {
@@ -679,10 +692,11 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   const handlePublishResults = async () => {
     if (!draftTourResults.length) return;
-    if (!confirm(`Publish ${draftTourResults.length} result(s) for ${currentTour.name} to the public leaderboard and match history?`)) return;
+    const selectedResultsTournament = tournaments.find((tournament) => tournament.id === resultsTournamentId) || currentTour;
+    if (!confirm(`Publish ${draftTourResults.length} result(s) for ${selectedResultsTournament.name} to the public leaderboard and match history?`)) return;
     try {
-      const publishedCount = await publishTournamentResults(currentTour.id);
-      recordAdminActivity('match_results_published', `Published ${publishedCount} result(s) for ${currentTour.name}.`);
+      const publishedCount = await publishTournamentResults(selectedResultsTournament.id);
+      void writeAdminActivityLog({ eventType: 'match_results_published', summary: `Published ${publishedCount} result(s) for ${selectedResultsTournament.name}.`, tournamentId: selectedResultsTournament.id, tournamentName: selectedResultsTournament.name }).catch((error) => console.warn('Could not save admin activity log:', error));
       setResMsg(`✅ ${publishedCount} result(s) published to Match History.`);
       window.setTimeout(() => setResMsg(null), 3000);
     } catch (err) {
@@ -690,14 +704,21 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
+  const selectedResultsTournament = tournaments.find((tournament) => tournament.id === resultsTournamentId) || currentTour;
+  const resultRegisteredTeams = (() => {
+    const sourceTeams = allRegisteredTeams.filter((team) => team.tournamentId === selectedResultsTournament.id && team.status === 'approved');
+    const teamsForSelectedTournament = sourceTeams.length ? sourceTeams : teams.filter((team) => team.tournamentId === selectedResultsTournament.id && team.status === 'approved');
+    return [...teamsForSelectedTournament].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '') || a.teamName.localeCompare(b.teamName));
+  })();
   const tourResults = results
-    .filter((r) => r.tournamentId === currentTour.id)
-    .sort((a, b) => a.position - b.position || b.kills - a.kills);
+    .filter((r) => r.tournamentId === selectedResultsTournament.id)
+    .sort((a, b) => (a.mapNumber || 1) - (b.mapNumber || 1) || a.position - b.position || b.kills - a.kills);
+  const selectedMapResults = tourResults.filter((result) => (result.mapNumber || 1) === resMapNumber);
   const draftTourResults = tourResults.filter((result) => result.published === false);
   const publishedTourResults = results
     .filter((result) => result.published !== false)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const overallBoard = buildLeaderboard(results);
+  const overallBoard = buildLeaderboard(tourResults);
 
   // Filter teams for current tournament
   const currentTourTeams = teams.filter((t) => t.tournamentId === currentTour.id);
@@ -1242,20 +1263,35 @@ export const AdminPanelModal: React.FC<Props> = ({
                         <Trophy size={14} /> Add Match Result
                       </div>
                       <p className="text-[11px] text-gray-400">
-                        Scrim: <span className="text-white font-semibold">{currentTour.name}</span>. Rank 1 = Winner (Booyah) — leaderboard e win count hobe.
+                        Choose a tournament, then add each registered squad’s Map, position and kills. Points calculate automatically.
                       </p>
 
+                      <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+                        <label className="block text-xs text-gray-400">Tournament
+                          <select value={resultsTournamentId} onChange={(event) => { setResultsTournamentId(event.target.value); setResTeam(''); setResMapNumber(1); setResMsg(null); }} className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="block text-xs text-gray-400">Map #
+                          <input type="number" min="1" max="99" value={resMapNumber} onChange={(event) => setResMapNumber(Math.max(1, Math.floor(Number(event.target.value) || 1)))} className="mt-1 w-full rounded-xl border border-[#2a2b36] bg-[#0b0c10] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500" />
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-cyan-300/10 bg-cyan-300/[.04] px-3 py-2 text-[10px] text-cyan-100">
+                        <span>{resultRegisteredTeams.length} registered teams</span>
+                        <span>{new Set(tourResults.map((result) => result.mapNumber || 1)).size} maps entered</span>
+                      </div>
+
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Team</label>
+                        <label className="block text-xs text-gray-400 mb-1">Registered team</label>
                         <select
                           value={resTeam}
                           onChange={(e) => setResTeam(e.target.value)}
                           className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                         >
                           <option value="">— Select registered team —</option>
-                          {currentTourTeams.map((t) => (
+                          {resultRegisteredTeams.map((t, index) => (
                             <option key={t.id} value={t.teamName}>
-                              {t.teamName}
+                              {String(index + 1).padStart(2, '0')} · {t.teamName}
                             </option>
                           ))}
                         </select>
@@ -1317,8 +1353,27 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </button>
                     </form>
 
+                    <section className="overflow-hidden rounded-xl border border-[#272833] bg-[#15161d]">
+                      <div className="flex items-center justify-between border-b border-white/[.06] px-3.5 py-3">
+                        <div className="text-xs font-bold uppercase tracking-wider text-gray-300">Registered teams</div>
+                        <span className="rounded-md border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-bold text-cyan-100">MAP {resMapNumber}</span>
+                      </div>
+                      {resultRegisteredTeams.length ? <div className="max-h-64 divide-y divide-white/[.05] overflow-y-auto">
+                        {resultRegisteredTeams.map((team, index) => {
+                          const saved = tourResults.some((result) => (result.mapNumber || 1) === resMapNumber && result.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase());
+                          return <button key={team.id} type="button" disabled={saved} onClick={() => { setResTeam(team.teamName); setResMsg(null); }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition hover:bg-white/[.035] disabled:cursor-default">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/30 text-[10px] font-black tabular-nums text-slate-400">{String(index + 1).padStart(2, '0')}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-white">{team.teamName}</span>
+                            {saved ? <span className="shrink-0 rounded-md border border-emerald-300/15 bg-emerald-300/[.06] px-2 py-1 text-[9px] font-bold text-emerald-200">ADDED</span> : <span className={`shrink-0 rounded-md px-2 py-1 text-[9px] font-bold ${resTeam === team.teamName ? 'bg-amber-300/15 text-amber-100' : 'bg-white/[.05] text-slate-400'}`}>{resTeam === team.teamName ? 'SELECTED' : 'SELECT'}</span>}
+                          </button>;
+                        })}
+                      </div> : <p className="px-3.5 py-5 text-center text-[11px] text-gray-500">No approved teams registered for this tournament.</p>}
+                    </section>
+
                     <div className="bg-[#15161d] border border-[#272833] rounded-xl p-4">
-                      <div className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-3">Overall Wins Ranking</div>
+                      <div className="mb-3 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-300"><span>Map {resMapNumber} standings</span><span className="text-[9px] font-medium normal-case tracking-normal text-gray-500">Booyah · Kills · Position · Total</span></div>
+                      {selectedMapResults.length ? <div className="overflow-x-auto"><table className="w-full min-w-[440px] text-left text-[10px]"><thead className="text-[9px] uppercase tracking-wider text-gray-500"><tr><th className="px-2 py-2">#</th><th className="px-2 py-2">Team</th><th className="px-2 py-2 text-center">Booyah</th><th className="px-2 py-2 text-center">Kills</th><th className="px-2 py-2 text-center">Pos.</th><th className="px-2 py-2 text-right">Total</th></tr></thead><tbody className="divide-y divide-white/[.05]">{selectedMapResults.map((result, index) => <tr key={result.id}><td className="px-2 py-2 font-bold text-slate-500">{String(index + 1).padStart(2, '0')}</td><td className="max-w-[130px] truncate px-2 py-2 font-semibold text-white">{result.teamName}</td><td className="px-2 py-2 text-center font-bold text-amber-200">{result.position === 1 ? '01' : '—'}</td><td className="px-2 py-2 text-center text-slate-200">{result.kills}</td><td className="px-2 py-2 text-center text-slate-200">#{result.position} <span className="text-indigo-300">({calcPoints(result.position, 0)})</span></td><td className="px-2 py-2 text-right font-black text-cyan-200">{result.points}</td></tr>)}</tbody></table></div> : <p className="mb-3 text-xs text-gray-500">No results added for Map {resMapNumber} yet.</p>}
+                      <div className="mt-4 border-t border-white/[.05] pt-3 text-[9px] font-bold uppercase tracking-wider text-gray-500">Overall wins ranking</div>
                       {overallBoard.length === 0 ? (
                         <p className="text-xs text-gray-500">Kono result nei.</p>
                       ) : (
@@ -1372,7 +1427,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                               <div className="min-w-0">
                                 <div className="font-bold text-white text-sm truncate">{r.teamName}</div>
                                 <div className="text-gray-400">
-                                  {r.kills} kills • <span className="text-indigo-300 font-mono">{r.points} pts</span>
+                                  Map {r.mapNumber || 1} • {r.kills} kills • <span className="text-indigo-300 font-mono">{r.points} pts</span>
                                   {(r.earnings || 0) > 0 && <span className="ml-2 text-emerald-300 font-semibold">৳{Number(r.earnings).toLocaleString()}</span>}
                                   {r.position === 1 && <span className="ml-2 text-amber-300 font-bold">WINNER</span>}
                                 </div>
@@ -1409,7 +1464,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                             <div><h4 className="text-sm font-extrabold text-white">{tour.name}</h4><p className="mt-1 text-[10px] text-slate-500">{tour.date} · {tour.time} · {placements.length} result{placements.length === 1 ? '' : 's'}</p></div>
                             <button type="button" onClick={() => { if (confirm(`Delete ${tour.name} and its registrations/results permanently?`)) void handleDeleteTournament(tour.id); }} className="rounded-lg border border-rose-300/15 px-3 py-2 text-[10px] font-bold text-rose-200 transition hover:bg-rose-300/[.08]">Delete tournament</button>
                           </div>
-                          {placements.length ? <div className="divide-y divide-white/[.05]">{placements.map((result) => <div key={result.id} className="flex items-center justify-between gap-3 px-4 py-2.5"><div className="flex min-w-0 items-center gap-3"><span className={`w-8 text-center text-xs font-black ${result.position === 1 ? 'text-amber-200' : 'text-slate-400'}`}>{result.position === 1 ? <Crown size={15} className="mx-auto" /> : `#${result.position}`}</span><span className="truncate text-xs font-bold text-white">{result.teamName}</span></div><div className="flex shrink-0 items-center gap-3 text-[10px] text-slate-400"><span>{result.kills} kills</span><span>{result.points} pts</span>{(result.earnings || 0) > 0 && <span className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</span>}</div></div>)}</div> : <div className="px-4 py-5 text-xs text-slate-500">No published placements were recorded for this tournament.</div>}
+                          {placements.length ? <div className="divide-y divide-white/[.05]">{placements.map((result) => <div key={result.id} className="flex items-center justify-between gap-3 px-4 py-2.5"><div className="flex min-w-0 items-center gap-3"><span className={`w-8 text-center text-xs font-black ${result.position === 1 ? 'text-amber-200' : 'text-slate-400'}`}>{result.position === 1 ? <Crown size={15} className="mx-auto" /> : `#${result.position}`}</span><span className="truncate text-xs font-bold text-white">{result.teamName}</span></div><div className="flex shrink-0 items-center gap-3 text-[10px] text-slate-400"><span>Map {result.mapNumber || 1}</span><span>{result.kills} kills</span><span>{result.points} pts</span>{(result.earnings || 0) > 0 && <span className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</span>}</div></div>)}</div> : <div className="px-4 py-5 text-xs text-slate-500">No published placements were recorded for this tournament.</div>}
                         </article>;
                       })}
                       {publishedTourResults.some((result) => !completedScrims.some((tour) => tour.id === result.tournamentId)) && <div className="space-y-2"><div className="px-1 pt-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Published matches</div>{publishedTourResults.filter((result) => !completedScrims.some((tour) => tour.id === result.tournamentId)).map((result) => <article key={result.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#282934] bg-[#15161d] p-3"><div className="flex min-w-0 items-center gap-3"><span className="w-8 text-center text-xs font-black text-slate-300">#{result.position}</span><div className="min-w-0"><div className="truncate text-xs font-bold text-white">{result.teamName}</div><div className="truncate text-[10px] text-slate-500">{result.tournamentName}</div></div></div><div className="shrink-0 text-right text-[10px] text-slate-400">{result.kills} kills · {result.points} pts{(result.earnings || 0) > 0 && <div className="font-bold text-emerald-300">৳{Number(result.earnings).toLocaleString()}</div>}</div></article>)}</div>}

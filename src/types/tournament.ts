@@ -115,6 +115,7 @@ export interface MatchResult {
   tournamentId: string;
   tournamentName: string;
   teamName: string;
+  mapNumber?: number;
   position: number; // 1 = winner (Booyah)
   kills: number;
   points: number; // placement points + kills
