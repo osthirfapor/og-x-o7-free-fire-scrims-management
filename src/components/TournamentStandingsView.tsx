@@ -39,29 +39,39 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
   const groups = useMemo(() => Array.from({ length: groupCount }, (_, index) => groupLabel(index)), [groupCount]);
   const matches = useMemo(() => Array.from(new Set(publishedResults.map((result) => result.mapNumber || 1))).sort((a, b) => a - b), [publishedResults]);
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [selectedMatch, setSelectedMatch] = useState(1);
+  const [selectedMatch, setSelectedMatch] = useState<number | 'all'>('all');
 
   useEffect(() => {
     setSelectedGroup('all');
-    setSelectedMatch(matches[0] || 1);
+    setSelectedMatch('all');
   }, [tournament.id]);
 
   useEffect(() => {
-    if (!matches.includes(selectedMatch)) setSelectedMatch(matches[0] || 1);
+    if (selectedMatch !== 'all' && !matches.includes(selectedMatch)) setSelectedMatch('all');
   }, [matches, selectedMatch]);
 
   const themeKey = tournament.standingsTheme && tournament.standingsTheme in GROUP_THEMES
     ? tournament.standingsTheme as keyof typeof GROUP_THEMES
     : 'lime';
   const theme = GROUP_THEMES[themeKey];
-  const resultsByTeam = new Map(publishedResults
-    .filter((result) => (result.mapNumber || 1) === selectedMatch)
-    .map((result) => [result.teamName.trim().toLowerCase(), result]));
+  const resultsByTeam = new Map<string, { booyah: number; kills: number; positionPoints: number; total: number; matches: number }>();
+  publishedResults
+    .filter((result) => selectedMatch === 'all' || (result.mapNumber || 1) === selectedMatch)
+    .forEach((result) => {
+      const key = result.teamName.trim().toLowerCase();
+      const totals = resultsByTeam.get(key) || { booyah: 0, kills: 0, positionPoints: 0, total: 0, matches: 0 };
+      totals.booyah += result.position === 1 ? 1 : 0;
+      totals.kills += result.kills || 0;
+      totals.positionPoints += Math.max(0, (result.points || 0) - (result.kills || 0));
+      totals.total += result.points || 0;
+      totals.matches += 1;
+      resultsByTeam.set(key, totals);
+    });
   const rows = tournamentTeams
     .filter((team) => selectedGroup === 'all' || teamGroups.get(team.teamName.trim().toLowerCase()) === selectedGroup)
     .map((team) => ({ team, result: resultsByTeam.get(team.teamName.trim().toLowerCase()) }))
     .sort((a, b) => {
-      if (a.result && b.result) return a.result.position - b.result.position || b.result.kills - a.result.kills;
+      if (a.result && b.result) return b.result.total - a.result.total || b.result.booyah - a.result.booyah || b.result.kills - a.result.kills;
       if (a.result) return -1;
       if (b.result) return 1;
       return a.team.teamName.localeCompare(b.team.teamName);
@@ -74,7 +84,7 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-emerald-200 sm:text-[10px]"><Trophy size={13} /> Published standings</div>
             <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{tournament.name}</h2>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · Match {selectedMatch}</p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-emerald-100/55 sm:text-xs">{selectedGroup === 'all' ? 'All groups' : selectedGroup} · {selectedMatch === 'all' ? `Overall · ${matches.length} matches` : `Match ${selectedMatch}`}</p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:max-w-md sm:flex-1 lg:max-w-lg">
             {groupingEnabled && <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Group
@@ -84,7 +94,8 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
               </select>
             </label>}
             <label className="text-[9px] font-bold uppercase tracking-wider text-emerald-100/55">Match
-              <select value={selectedMatch} onChange={(event) => setSelectedMatch(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-emerald-100/10 bg-black/25 px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-emerald-200/40">
+              <select value={selectedMatch === 'all' ? 'all' : String(selectedMatch)} onChange={(event) => setSelectedMatch(event.target.value === 'all' ? 'all' : Number(event.target.value))} className="mt-1 w-full rounded-xl border border-emerald-100/10 bg-black/25 px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-emerald-200/40">
+                <option value="all">Overall · All Matches</option>
                 {(matches.length ? matches : [1]).map((match) => <option key={match} value={match}>Match {match}</option>)}
               </select>
             </label>
@@ -103,11 +114,11 @@ export const TournamentStandingsView: React.FC<Props> = ({ tournament, teams, re
             {rows.map(({ team, result }, index) => <tr key={team.id} className="text-xs font-extrabold sm:text-sm">
               <td style={{ backgroundColor: theme.row, color: theme.soft }} className="rounded-l-full px-3 py-2.5 text-center tabular-nums sm:px-4">{String(index + 1).padStart(2, '0')}</td>
               <td style={{ backgroundColor: theme.row, color: theme.soft }} className="px-2 py-2"><span className="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/25 text-[9px] font-black">{team.teamLogo ? <img src={team.teamLogo} alt="" className="h-full w-full object-cover" /> : team.teamName.trim().slice(0, 2).toUpperCase()}</span></td>
-              <td style={{ backgroundColor: theme.row }} className="px-3 py-2.5 text-white sm:px-4">{team.teamName}</td>
-              <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result?.position === 1 ? '01' : '—'}</td>
+              <td style={{ backgroundColor: theme.row }} className="px-3 py-2.5 text-white sm:px-4"><div>{team.teamName}</div><div style={{ color: theme.soft }} className="mt-0.5 text-[8px] font-bold uppercase tracking-wider sm:text-[9px]">{result ? `${result.booyah} Booyah · ${result.matches} maps` : 'No published result'}</div></td>
+              <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result ? result.booyah : '—'}</td>
               <td style={{ backgroundColor: theme.row }} className="px-3 py-2.5 text-center tabular-nums text-white">{result?.kills ?? '—'}</td>
-              <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result ? Math.max(0, result.points - result.kills) : '—'}</td>
-              <td style={{ backgroundColor: theme.row, color: theme.soft }} className="rounded-r-full px-3 py-2.5 text-center tabular-nums sm:px-4">{result?.points ?? '—'}</td>
+              <td style={{ backgroundColor: theme.soft, color: theme.text }} className="px-3 py-2.5 text-center tabular-nums">{result ? result.positionPoints : '—'}</td>
+              <td style={{ backgroundColor: theme.row, color: theme.soft }} className="rounded-r-full px-3 py-2.5 text-center tabular-nums sm:px-4">{result?.total ?? '—'}</td>
             </tr>)}
             {!rows.length && <tr><td colSpan={7} className="rounded-xl border border-white/[.06] bg-black/20 px-4 py-10 text-center text-xs text-slate-400">No registered teams in this group.</td></tr>}
           </tbody>

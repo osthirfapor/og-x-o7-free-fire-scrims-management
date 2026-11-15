@@ -255,7 +255,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [showStandingsPreview, setShowStandingsPreview] = useState(false);
   const [previewTournamentId, setPreviewTournamentId] = useState(activeTournament.id);
   const [previewGroup, setPreviewGroup] = useState('all');
-  const [previewMapNumber, setPreviewMapNumber] = useState(1);
+  const [previewMapNumber, setPreviewMapNumber] = useState<number | 'all'>('all');
   const [previewTableTheme, setPreviewTableTheme] = useState<keyof typeof STANDINGS_COLOR_THEMES>(() => {
     const savedTheme = localStorage.getItem('ogxo7_standings_table_theme');
     return savedTheme && savedTheme in STANDINGS_COLOR_THEMES ? savedTheme as keyof typeof STANDINGS_COLOR_THEMES : 'lime';
@@ -763,17 +763,24 @@ export const AdminPanelModal: React.FC<Props> = ({
   const previewTeamGroups = new Map(previewRegisteredTeams.map((team, index) => [team.teamName.trim().toLocaleLowerCase(), resultGroupLabel(Math.floor(index / previewTeamsPerGroup))]));
   const previewGroupOptions = previewGroupsEnabled ? Array.from({ length: previewGroupCount }, (_, index) => resultGroupLabel(index)) : [];
   const previewTournamentResults = results.filter((result) => result.tournamentId === previewTournament.id);
-  const previewMapOptions = Array.from(new Set([...previewTournamentResults.map((result) => result.mapNumber || 1), previewMapNumber])).sort((a, b) => a - b);
+  const previewMapOptions = Array.from(new Set([1, ...previewTournamentResults.map((result) => result.mapNumber || 1)])).sort((a, b) => a - b);
   const standingsTheme = STANDINGS_COLOR_THEMES[previewTableTheme];
   const previewRows = previewRegisteredTeams
     .filter((team) => previewGroup === 'all' || previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) === previewGroup)
-    .map((team) => ({
-      team,
-      group: previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) || 'OPEN FIELD',
-      result: previewTournamentResults.find((entry) => (entry.mapNumber || 1) === previewMapNumber && entry.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase()),
-    }))
+    .map((team) => {
+      const teamResults = previewTournamentResults.filter((entry) => (previewMapNumber === 'all' || (entry.mapNumber || 1) === previewMapNumber) && entry.teamName.trim().toLocaleLowerCase() === team.teamName.trim().toLocaleLowerCase());
+      if (!teamResults.length) return { team, group: previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) || 'OPEN FIELD', result: undefined };
+      const result = teamResults.reduce((total, entry) => ({
+        booyah: total.booyah + (entry.position === 1 ? 1 : 0),
+        kills: total.kills + (entry.kills || 0),
+        positionPoints: total.positionPoints + Math.max(0, (entry.points || 0) - (entry.kills || 0)),
+        total: total.total + (entry.points || 0),
+        matches: total.matches + 1,
+      }), { booyah: 0, kills: 0, positionPoints: 0, total: 0, matches: 0 });
+      return { team, group: previewTeamGroups.get(team.teamName.trim().toLocaleLowerCase()) || 'OPEN FIELD', result };
+    })
     .sort((a, b) => {
-      if (a.result && b.result) return a.result.position - b.result.position || b.result.kills - a.result.kills;
+      if (a.result && b.result) return b.result.total - a.result.total || b.result.booyah - a.result.booyah || b.result.kills - a.result.kills;
       if (a.result) return -1;
       if (b.result) return 1;
       return new Date(a.team.createdAt).getTime() - new Date(b.team.createdAt).getTime() || a.team.id.localeCompare(b.team.id);
@@ -1448,7 +1455,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} entry preview</div>
                           <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name} · {selectedMapResults.length}/{resultRegisteredTeams.length} teams entered</div>
                         </div>
-                        <button type="button" onClick={() => { setPreviewTournamentId(resultsTournamentId); setPreviewGroup((selectedResultsTournament.groupsEnabled || selectedResultsTournament.unlimitedGroups || selectedResultsTournament.unlimitedTeams) ? resultGroupLabel(0) : 'all'); setPreviewMapNumber(resMapNumber); setShowStandingsPreview(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
+                        <button type="button" onClick={() => { setPreviewTournamentId(resultsTournamentId); setPreviewGroup((selectedResultsTournament.groupsEnabled || selectedResultsTournament.unlimitedGroups || selectedResultsTournament.unlimitedTeams) ? resultGroupLabel(0) : 'all'); setPreviewMapNumber('all'); setShowStandingsPreview(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left text-[10px]">
@@ -1534,14 +1541,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-lime-200 sm:text-[10px]"><span className="h-px w-6 bg-lime-300" /> Tournament standings</div>
                         <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{previewTournament.name}</h2>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-lime-100/60 sm:text-xs">{previewGroup === 'all' ? 'All groups' : previewGroup} · Match {previewMapNumber}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-lime-100/60 sm:text-xs">{previewGroup === 'all' ? 'All groups' : previewGroup} · {previewMapNumber === 'all' ? `Overall · ${new Set(previewTournamentResults.map((result) => result.mapNumber || 1)).size} matches` : `Match ${previewMapNumber}`}</p>
                       </div>
                       <button type="button" onClick={() => setShowStandingsPreview(false)} aria-label="Close preview" className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={18} /></button>
                     </div>
                     <div className="relative min-h-0 flex-1 overflow-auto p-3 sm:p-6">
                       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Tournament
-                          <select value={previewTournament.id} onChange={(event) => { setPreviewTournamentId(event.target.value); setPreviewGroup('all'); setPreviewMapNumber(1); }} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                          <select value={previewTournament.id} onChange={(event) => { setPreviewTournamentId(event.target.value); setPreviewGroup('all'); setPreviewMapNumber('all'); }} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
                             {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
                           </select>
                         </label>
@@ -1552,7 +1559,8 @@ export const AdminPanelModal: React.FC<Props> = ({
                           </select>
                         </label>
                         <label className="text-[9px] font-bold uppercase tracking-wider text-lime-100/55">Match
-                          <select value={previewMapNumber} onChange={(event) => setPreviewMapNumber(Number(event.target.value))} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                          <select value={previewMapNumber === 'all' ? 'all' : String(previewMapNumber)} onChange={(event) => setPreviewMapNumber(event.target.value === 'all' ? 'all' : Number(event.target.value))} className="mt-1.5 w-full rounded-xl border border-lime-200/15 bg-[#071c12] px-3 py-2.5 text-xs font-semibold normal-case tracking-normal text-white outline-none focus:border-lime-300/50">
+                            <option value="all">Overall · All Matches</option>
                             {previewMapOptions.map((mapNumber) => <option key={mapNumber} value={mapNumber}>Match {mapNumber}</option>)}
                           </select>
                         </label>
@@ -1572,14 +1580,14 @@ export const AdminPanelModal: React.FC<Props> = ({
                             </thead>
                             <tbody>
                               {previewRows.length ? previewRows.map(({ team, result }, index) => (
-                                <tr key={team.id} className={`text-xs font-extrabold sm:text-sm ${result?.position === 1 ? 'text-lime-100' : ''}`}>
+                                <tr key={team.id} className={`text-xs font-extrabold sm:text-sm ${result?.booyah ? 'text-lime-100' : ''}`}>
                                   <td style={{ backgroundColor: standingsTheme.row, color: standingsTheme.soft }} className="rounded-l-full px-3 py-3 text-center tabular-nums sm:px-4">{String(index + 1).padStart(2, '0')}</td>
                                   <td style={{ backgroundColor: standingsTheme.row, borderColor: `${standingsTheme.soft}33` }} className="border-y px-2 py-2 text-center"><span className="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border bg-black/25 text-[9px] font-black" style={{ borderColor: `${standingsTheme.soft}33`, color: standingsTheme.soft }}>{team.teamLogo ? <img src={team.teamLogo} alt="" className="h-full w-full object-cover" /> : team.teamName.trim().slice(0, 2).toUpperCase()}</span></td>
-                                  <td style={{ backgroundColor: standingsTheme.row }} className="px-3 py-3 text-white sm:px-4">{team.teamName}</td>
-                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? (result.position === 1 ? '01' : '—') : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row }} className="px-3 py-3 text-white sm:px-4"><div>{team.teamName}</div><div style={{ color: standingsTheme.soft }} className="mt-0.5 text-[8px] font-bold uppercase tracking-wider sm:text-[9px]">{result ? `${result.booyah} Booyah · ${result.matches} matches` : 'No result'}</div></td>
+                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? result.booyah : '—'}</td>
                                   <td style={{ backgroundColor: standingsTheme.row }} className="px-3 py-3 text-center tabular-nums text-white">{result ? result.kills : '—'}</td>
-                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? calcPoints(result.position, 0) : '—'}</td>
-                                  <td style={{ backgroundColor: standingsTheme.row, color: standingsTheme.soft }} className="rounded-r-full px-3 py-3 text-center tabular-nums sm:px-4">{result ? result.points : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.soft, color: standingsTheme.text }} className="px-3 py-3 text-center tabular-nums">{result ? result.positionPoints : '—'}</td>
+                                  <td style={{ backgroundColor: standingsTheme.row, color: standingsTheme.soft }} className="rounded-r-full px-3 py-3 text-center tabular-nums sm:px-4">{result ? result.total : '—'}</td>
                                 </tr>
                               )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-lime-100/55">No approved teams registered for this group yet.</td></tr>}
                             </tbody>
