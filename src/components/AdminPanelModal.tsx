@@ -32,6 +32,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageCircle,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sendDiscordEvent } from '../lib/discordEvents';
@@ -235,6 +236,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [resEarnings, setResEarnings] = useState(0);
   const [resSaving, setResSaving] = useState(false);
   const [resMsg, setResMsg] = useState<string | null>(null);
+  const [showStandingsPreview, setShowStandingsPreview] = useState(false);
 
   // Sync when activeTournament changes
   useEffect(() => {
@@ -722,6 +724,14 @@ export const AdminPanelModal: React.FC<Props> = ({
     if (bResult) return 1;
     return (a.createdAt || '').localeCompare(b.createdAt || '') || a.teamName.localeCompare(b.teamName);
   });
+  const overallLeaderboard = buildLeaderboard(tourResults);
+  const overallRows = [...new Map([
+    ...resultRegisteredTeams.map((team) => [team.teamName.trim().toLocaleLowerCase(), team.teamName] as const),
+    ...overallLeaderboard.map((entry) => [entry.teamName.trim().toLocaleLowerCase(), entry.teamName] as const),
+  ]).values()].map((teamName) => {
+    const result = overallLeaderboard.find((entry) => entry.teamName.trim().toLocaleLowerCase() === teamName.trim().toLocaleLowerCase());
+    return { teamName, booyah: result?.wins || 0, kills: result?.kills || 0, positionPoints: Math.max(0, (result?.points || 0) - (result?.kills || 0)), total: result?.points || 0, maps: result?.matches || 0 };
+  }).sort((a, b) => b.total - a.total || b.booyah - a.booyah || b.kills - a.kills || a.teamName.localeCompare(b.teamName));
   const draftTourResults = tourResults.filter((result) => result.published === false);
   const publishedTourResults = results
     .filter((result) => result.published !== false)
@@ -1384,10 +1394,10 @@ export const AdminPanelModal: React.FC<Props> = ({
                     <section className="mb-4 overflow-hidden rounded-xl border border-cyan-300/15 bg-[#0e1117]">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[.06] px-3.5 py-3">
                         <div>
-                          <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} standings preview</div>
+                          <div className="text-xs font-bold uppercase tracking-wider text-white">Map {resMapNumber} entry preview</div>
                           <div className="mt-1 text-[10px] text-slate-500">{selectedResultsTournament.name} · {selectedMapResults.length}/{resultRegisteredTeams.length} teams entered</div>
                         </div>
-                        <span className="rounded-md border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[9px] font-bold text-cyan-100">LIVE PREVIEW</span>
+                        <button type="button" onClick={() => setShowStandingsPreview(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-300/25 bg-lime-300/[.08] px-3 py-2 text-[10px] font-extrabold text-lime-100 transition hover:bg-lime-300/[.15]"><Eye size={13} /> Preview standings</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left text-[10px]">
@@ -1461,6 +1471,48 @@ export const AdminPanelModal: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {tab === 'results' && showStandingsPreview && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-3 backdrop-blur-md sm:p-6" onClick={() => setShowStandingsPreview(false)}>
+                  <section role="dialog" aria-modal="true" aria-label="Overall standings preview" onClick={(event) => event.stopPropagation()} className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-lime-300/20 bg-[#032c1b] text-white shadow-[0_24px_100px_rgba(0,0,0,.7)] sm:rounded-3xl">
+                    <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-lime-300/10 blur-[100px]" />
+                    <div className="relative flex items-start justify-between gap-4 border-b border-lime-200/10 px-4 py-4 sm:px-7 sm:py-5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-lime-200 sm:text-[10px]"><span className="h-px w-6 bg-lime-300" /> Tournament standings preview</div>
+                        <h2 className="mt-2 truncate text-lg font-black uppercase tracking-wide text-white sm:text-2xl">{selectedResultsTournament.name}</h2>
+                        <p className="mt-1 text-[10px] text-lime-100/55 sm:text-xs">OVERALL STANDINGS · {new Set(tourResults.map((result) => result.mapNumber || 1)).size} maps recorded</p>
+                      </div>
+                      <button type="button" onClick={() => setShowStandingsPreview(false)} aria-label="Close preview" className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={18} /></button>
+                    </div>
+                    <div className="relative min-h-0 flex-1 overflow-auto p-3 sm:p-6">
+                      <div className="overflow-hidden rounded-xl border border-lime-300/15 bg-[#052415] sm:rounded-2xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[620px] border-separate border-spacing-y-1.5 px-2 py-2 text-left sm:border-spacing-y-2 sm:px-3 sm:py-3">
+                            <thead>
+                              <tr className="text-[9px] font-black uppercase tracking-wider text-[#062c1b] sm:text-xs">
+                                {['#', 'Team name', 'Booyah', 'Kill', 'Pos.', 'Total'].map((heading) => <th key={heading} className={`bg-lime-300 px-3 py-2.5 first:rounded-l-full last:rounded-r-full sm:px-4 sm:py-3 ${heading === 'Team name' ? 'w-[45%] text-left' : 'text-center'}`}>{heading}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {overallRows.length ? overallRows.map((row, index) => (
+                                <tr key={row.teamName} className="text-xs font-extrabold sm:text-sm">
+                                  <td className="rounded-l-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{String(index + 1).padStart(2, '0')}</td>
+                                  <td className="bg-[#0a5734] px-3 py-3 text-white sm:px-4">{row.teamName}</td>
+                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{row.booyah ? String(row.booyah).padStart(2, '0') : '—'}</td>
+                                  <td className="bg-[#0a5734] px-3 py-3 text-center tabular-nums text-white">{row.kills}</td>
+                                  <td className="bg-lime-200 px-3 py-3 text-center tabular-nums text-[#082c1b]">{row.positionPoints}</td>
+                                  <td className="rounded-r-full bg-[#0a5734] px-3 py-3 text-center tabular-nums text-lime-100 sm:px-4">{row.total}</td>
+                                </tr>
+                              )) : <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-lime-100/55">No teams registered in this tournament yet.</td></tr>}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-right text-[9px] font-bold uppercase tracking-[.16em] text-lime-100/35">Preview only · not published</p>
+                    </div>
+                  </section>
                 </div>
               )}
 
