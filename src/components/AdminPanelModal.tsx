@@ -194,6 +194,7 @@ export const AdminPanelModal: React.FC<Props> = ({
 
   const [squadSearch, setSquadSearch] = useState('');
   const [squadTournamentFilter, setSquadTournamentFilter] = useState<string | null>(null);
+  const [databaseTournamentFilter, setDatabaseTournamentFilter] = useState('all');
   const [squadDeleteMessage, setSquadDeleteMessage] = useState<string | null>(null);
   const [deletingSquadName, setDeletingSquadName] = useState<string | null>(null);
 
@@ -830,8 +831,11 @@ export const AdminPanelModal: React.FC<Props> = ({
   });
   const visibleDatabaseSquads = registeredSquads.filter((squad) => {
     const q = databaseTeamSearch.toLocaleLowerCase().trim();
-    return !q || `${squad.teamName} ${squad.players.map((player) => player.name).join(' ')}`.toLocaleLowerCase().includes(q);
+    const activeRegistrations = squad.registrations.filter((registration) => activeTournamentIds.has(registration.id));
+    const matchesTournament = databaseTournamentFilter === 'all' || activeRegistrations.some((registration) => registration.id === databaseTournamentFilter);
+    return matchesTournament && (!q || `${squad.teamName} ${squad.players.map((player) => player.name).join(' ')} ${activeRegistrations.map((registration) => registration.name).join(' ')}`.toLocaleLowerCase().includes(q));
   });
+  const selectedDatabaseTournament = activeScrims.find((tournament) => tournament.id === databaseTournamentFilter);
   const handleRemoveSquadFromTournament = async (squad: (typeof registeredSquads)[number]) => {
     if (!squadTournamentFilter) return;
     const registration = allRegisteredTeams.find((team) => team.tournamentId === squadTournamentFilter
@@ -1079,8 +1083,12 @@ export const AdminPanelModal: React.FC<Props> = ({
                 <section className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200">Team database</div><h3 className="mt-1 text-lg font-extrabold text-white">All Squads ({registeredSquads.length})</h3><p className="mt-1 text-xs text-slate-400">Open a team to see its player IGNs. WhatsApp numbers are visible to admins only.</p></div>
-                    <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={databaseTeamSearch} onChange={(event) => setDatabaseTeamSearch(event.target.value)} placeholder="Search team or player IGN" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                      <label className="block"><span className="sr-only">Filter by active tournament</span><select value={databaseTournamentFilter} onChange={(event) => setDatabaseTournamentFilter(event.target.value)} className="w-full rounded-lg border border-white/10 bg-[#0b0c10] px-3 py-2 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-56"><option value="all">All active tournaments</option>{activeScrims.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
+                      <label className="relative block"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input value={databaseTeamSearch} onChange={(event) => setDatabaseTeamSearch(event.target.value)} placeholder="Search team or player IGN" className="w-full rounded-lg border border-white/10 bg-[#0b0c10] py-2 pl-8 pr-3 text-[11px] text-white outline-none focus:border-cyan-300/30 sm:w-64"/></label>
+                    </div>
                   </div>
+                  {selectedDatabaseTournament && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-2"><div className="text-[11px] text-cyan-100"><span className="font-bold">{selectedDatabaseTournament.name}</span><span className="ml-2 text-cyan-100/60">{visibleDatabaseSquads.length} registered team{visibleDatabaseSquads.length === 1 ? '' : 's'}</span></div><button type="button" onClick={() => void copyRegistrationLink(selectedDatabaseTournament.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-300/[.07] px-2.5 py-1.5 text-[10px] font-bold text-cyan-100 hover:bg-cyan-300/[.13]">{copiedRegistrationLink === selectedDatabaseTournament.id ? <Check size={12}/> : <Copy size={12}/>} {copiedRegistrationLink === selectedDatabaseTournament.id ? 'Link copied' : 'Copy registration link'}</button></div>}
                   {visibleDatabaseSquads.length ? <div className="space-y-2">{visibleDatabaseSquads.map((squad) => {
                     const key = squadKey(squad.teamName);
                     const expanded = expandedDatabaseTeam === key;
@@ -1101,7 +1109,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                           {openDatabaseLoginMenu === key && <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-white/10 bg-[#191a22] p-1.5 shadow-2xl"><button type="button" onClick={() => void copySquadLoginDetails(squad)} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/[.07]">{copiedDatabaseLogin === key ? 'Copied login details' : 'Copy login details'}</button><button type="button" disabled={deletingSquadName === squad.teamName} onClick={() => { setOpenDatabaseLoginMenu(null); void handleDeleteDatabaseRecord(squad); }} className="w-full rounded-lg px-3 py-2 text-left text-[11px] font-semibold text-rose-200 hover:bg-rose-300/[.08] disabled:opacity-50">{deletingSquadName === squad.teamName ? 'Deleting…' : 'Delete database record'}</button></div>}
                         </div>
                       </div>
-                      {expanded && <div className="flex flex-wrap gap-1.5 border-t border-white/[.07] bg-black/10 px-3 py-2.5">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.name}</span>)}</div>}
+                      {expanded && <div className="grid gap-3 border-t border-white/[.07] bg-black/10 px-3 py-2.5 sm:grid-cols-2"><div><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Player IGNs</div><div className="flex flex-wrap gap-1.5">{squad.players.map((player) => <span key={`${key}-${player.slotIndex}-${player.name}`} className="rounded-md border border-white/[.07] bg-black/20 px-2 py-1 text-[10px] text-slate-300">{player.name}</span>)}</div></div><div><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Active tournaments</div><div className="flex flex-wrap gap-1.5">{squad.registrations.filter((registration) => activeTournamentIds.has(registration.id)).map((registration) => <span key={`${registration.id}-${key}`} className="rounded-md border border-cyan-300/15 bg-cyan-300/[.06] px-2 py-1 text-[10px] text-cyan-100">{registration.name}</span>)}{!squad.registrations.some((registration) => activeTournamentIds.has(registration.id)) && <span className="text-[10px] text-slate-500">No active tournament registrations</span>}</div></div></div>}
                     </article>;
                   })}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-slate-500">{registeredSquads.length ? 'No team matches this search.' : 'Teams saved in the database will appear here.'}</div>}
                 </section>
