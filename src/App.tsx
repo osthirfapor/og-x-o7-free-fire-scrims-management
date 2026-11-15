@@ -32,6 +32,8 @@ import {
   Hash,
   Edit2,
   History as HistoryIcon,
+  Instagram,
+  ExternalLink,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Tournament, Team, TeamAccount, TournamentCategory, TeamProfile, MatchResult } from './types/tournament';
@@ -684,6 +686,26 @@ function MainApp() {
               {loadingTournaments ? 'Connecting to Firebase' : `${filteredTournaments.length} tournaments live`}
             </div>
           </div>
+          <section aria-label="Follow our community" className="social-connect-panel mb-6 overflow-hidden rounded-2xl border border-white/[.08] bg-gradient-to-r from-[#15151d] via-[#12151d] to-[#101b1a] p-3 shadow-lg shadow-black/10 sm:mb-7 sm:p-4">
+            <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 px-1 sm:mb-3">
+              <div><div className="text-[9px] font-black uppercase tracking-[.2em] text-cyan-200">Stay connected</div><h2 className="mt-0.5 text-sm font-extrabold text-white sm:text-base">Follow our community</h2></div>
+              <span className="text-[9px] text-slate-500 sm:text-[10px]">News · events · tournament updates</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+              <a href="https://www.instagram.com/renzora.group/?utm_source=ig_web_button_share_sheet" target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-fuchsia-300/10 bg-fuchsia-300/[.035] px-2.5 py-2.5 transition hover:border-fuchsia-300/25 hover:bg-fuchsia-300/[.08] sm:px-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500/20 to-orange-400/15 text-fuchsia-200"><Instagram size={16}/></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-extrabold text-white sm:text-[11px]">Renzora Group</span><span className="block text-[8px] text-slate-500 sm:text-[9px]">Instagram</span></span><ExternalLink size={12} className="shrink-0 text-slate-600 transition group-hover:text-fuchsia-200"/>
+              </a>
+              <a href="https://www.instagram.com/o7federation_official?utm_source=ig_web_button_share_sheet&mdxt=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-pink-300/10 bg-pink-300/[.035] px-2.5 py-2.5 transition hover:border-pink-300/25 hover:bg-pink-300/[.08] sm:px-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500/20 to-violet-400/15 text-pink-200"><Instagram size={16}/></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-extrabold text-white sm:text-[11px]">O7 Federation</span><span className="block text-[8px] text-slate-500 sm:text-[9px]">Instagram</span></span><ExternalLink size={12} className="shrink-0 text-slate-600 transition group-hover:text-pink-200"/>
+              </a>
+              <a href="https://www.facebook.com/profile.php?id=61586693751226" target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-blue-300/10 bg-blue-300/[.035] px-2.5 py-2.5 transition hover:border-blue-300/25 hover:bg-blue-300/[.08] sm:px-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-lg font-black text-blue-200">f</span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-extrabold text-white sm:text-[11px]">Facebook</span><span className="block text-[8px] text-slate-500 sm:text-[9px]">O7 Federation</span></span><ExternalLink size={12} className="shrink-0 text-slate-600 transition group-hover:text-blue-200"/>
+              </a>
+              <a href="https://chat.whatsapp.com/JxesDN4y8fB6QT68aygFWr" onClick={(event) => { event.preventDefault(); openWhatsAppTab('https://chat.whatsapp.com/JxesDN4y8fB6QT68aygFWr'); }} className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-emerald-300/10 bg-emerald-300/[.035] px-2.5 py-2.5 transition hover:border-emerald-300/25 hover:bg-emerald-300/[.08] sm:px-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-200"><MessageCircle size={16}/></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-extrabold text-white sm:text-[11px]">WhatsApp Group</span><span className="block text-[8px] text-slate-500 sm:text-[9px]">Tournament updates</span></span><ExternalLink size={12} className="shrink-0 text-slate-600 transition group-hover:text-emerald-200"/>
+              </a>
+            </div>
+          </section>
           {/* TAB 1: ALL TOURNAMENTS WITH SQUARE SHAPE CARDS (Matches Image Reference) */}
           {activeTab === 'tournaments' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
