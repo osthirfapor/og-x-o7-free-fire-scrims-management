@@ -70,6 +70,11 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, accounts, tournaments
       playerMap: Map<string, SquadPlayer>;
     }
     const drafts = new Map<string, Draft>();
+    const accountByTeam = new Map(
+      accounts
+        .filter((account) => account.status === 'approved' || account.status === 'pending')
+        .map((account) => [account.teamName.trim().toLocaleLowerCase(), account]),
+    );
     accounts
       .filter((account) => account.status === 'approved' || account.status === 'pending')
       .forEach((account) => {
@@ -115,7 +120,9 @@ export const PlayerSearchView: React.FC<Props> = ({ teams, accounts, tournaments
           playerMap: new Map<string, SquadPlayer>(),
         };
 
-        if (team.teamLogo) draft.logo = team.teamLogo;
+        // The account is the current profile source; registration documents can
+        // retain the older logo that was uploaded when that tournament was joined.
+        if (!accountByTeam.get(key)?.teamLogo && team.teamLogo) draft.logo = team.teamLogo;
         if (team.leaderName) draft.leaderName = team.leaderName;
 
         const teamMatches = matchGroups.get(teamKey(team.tournamentId, team.teamName)) || [];
