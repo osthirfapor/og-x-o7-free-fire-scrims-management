@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Copy, MessageCircle, Users, X } from 'lucide-react';
 import { Team, Tournament } from '../types/tournament';
+import { openWhatsAppTab } from '../utils/openWhatsAppTab';
 
 interface Props {
   team: Team;
@@ -30,6 +31,8 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
+  const supportWhatsAppMessage = `Hi, I need support with my tournament registration.\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTeam leader: ${team.leaderName}\nTournament: ${tournament.name}`;
+  const supportWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(supportWhatsAppMessage)}`;
   const tournamentDiscordUrl = 'https://discord.gg/Fj8stQdGwS';
 
   return (
@@ -135,12 +138,11 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
         {/* Footer Actions */}
         <div className="sticky bottom-0 -mx-3 -mb-3 mt-2 flex flex-row justify-between gap-2 border-t border-[#23242e] bg-[#161922]/95 p-3 pt-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:mt-0 sm:flex-row sm:justify-between sm:bg-transparent sm:p-0 sm:pt-3">
           <a
-            href={tournamentDiscordUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-2.5 py-2 text-[10px] font-bold text-indigo-300 transition-colors hover:bg-indigo-500/20 sm:gap-2 sm:px-4 sm:text-xs"
+            href={supportWhatsAppUrl}
+            onClick={(event) => { event.preventDefault(); openWhatsAppTab(supportWhatsAppUrl); }}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-2 text-[10px] font-bold text-emerald-300 transition-colors hover:bg-emerald-500/20 sm:gap-2 sm:px-4 sm:text-xs"
           >
-            <MessageCircle size={15} /> Discord Ticket Support
+            <MessageCircle size={15} /> WhatsApp Support
           </a>
           <button
             onClick={onClose}
