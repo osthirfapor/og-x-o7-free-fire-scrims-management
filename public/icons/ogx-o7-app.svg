@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#171c2a"/>
+      <stop offset="1" stop-color="#07080b"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffe477"/>
+      <stop offset=".48" stop-color="#ff8a32"/>
+      <stop offset="1" stop-color="#ff4d23"/>
+    </linearGradient>
+    <linearGradient id="slash" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#38d8f3"/>
+      <stop offset="1" stop-color="#6a82ff"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect x="14" y="14" width="484" height="484" rx="108" fill="none" stroke="#ffffff" stroke-opacity=".1" stroke-width="3"/>
+  <path d="M50 120h52M410 392h52M386 72l34 34M92 406l34 34" fill="none" stroke="#40d9f2" stroke-opacity=".22" stroke-width="7" stroke-linecap="round"/>
+  <path d="M116 178a93 93 0 1 1 0 156 93 93 0 0 1 0-156Z" fill="none" stroke="url(#mark)" stroke-width="34" filter="url(#glow)"/>
+  <path d="M244 337 325 145h83l-81 192h-83Z" fill="url(#slash)"/>
+  <path d="m319 145 77 0-24 57h-77l24-57Z" fill="#f6fbff"/>
+  <path d="m291 280 77 0-24 57h-77l24-57Z" fill="#ff9a3d"/>
+  <path d="M83 402h346" stroke="#ffffff" stroke-opacity=".1" stroke-width="2"/>
+  <text x="256" y="450" text-anchor="middle" fill="#e9eef9" font-family="Arial, sans-serif" font-size="25" font-weight="800" letter-spacing="8">OG  ×  O7</text>
+</svg>

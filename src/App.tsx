@@ -53,6 +53,7 @@ import { testConnection } from './lib/firebase';
 import { sendDiscordEvent } from './lib/discordEvents';
 import { RegistrationModal } from './components/RegistrationModal';
 import { RegistrationSuccessModal } from './components/RegistrationSuccessModal';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { TeamLoginGate } from './components/TeamLoginGate';
 import { TeamAccountRegistrationModal } from './components/TeamAccountRegistrationModal';
 import { EditTeamProfileModal } from './components/EditTeamProfileModal';
@@ -479,6 +480,7 @@ function MainApp() {
   if (!teamProfile) {
     return (
       <>
+        <PwaInstallPrompt />
         <WhatsAppSupportButton />
         <TeamLoginGate
           prefill={newAccountCredentials}
@@ -548,6 +550,7 @@ function MainApp() {
 
   return (
     <div className="app-shell relative isolate min-h-screen text-white font-sans flex flex-col md:flex-row antialiased select-none">
+      <PwaInstallPrompt />
       <WhatsAppSupportButton />
       {!teamProfile.whatsappNumber && <FirstLoginWhatsAppModal onSave={(whatsappNumber) => {
         const profile = { ...teamProfile, whatsappNumber, updatedAt: new Date().toISOString() };
