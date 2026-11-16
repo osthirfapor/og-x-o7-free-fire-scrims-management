@@ -33,7 +33,7 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
   };
   const supportWhatsAppMessage = `Hi, I need support with my tournament registration.\nRegistration ID: ${team.registrationId}\nTeam: ${team.teamName}\nTeam leader: ${team.leaderName}\nTournament: ${tournament.name}`;
   const supportWhatsAppUrl = `https://wa.me/8801937679130?text=${encodeURIComponent(supportWhatsAppMessage)}`;
-  const tournamentDiscordUrl = 'https://discord.gg/Fj8stQdGwS';
+  const tournamentUpdatesGroupUrl = 'https://chat.whatsapp.com/JxesDN4y8fB6QT68aygFWr';
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-2 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4">
@@ -60,9 +60,9 @@ export const RegistrationSuccessModal: React.FC<Props> = ({ team, tournament, on
           </p>
         </div>
 
-        <div role="note" className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-indigo-300/25 bg-indigo-300/[.07] p-2.5 sm:mb-5 sm:gap-2.5 sm:p-3">
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className="rounded bg-indigo-300/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-indigo-200">Required</span><div className="text-[11px] font-extrabold text-white sm:text-xs">Join our Discord server</div></div><p className="mt-1 hidden text-[10px] leading-4 text-slate-300 sm:block">Join for tournament announcements, room IDs, and updates.</p><p className="mt-1 text-[9px] text-slate-300 sm:hidden">Required for tournament updates</p></div>
-          <a href={tournamentDiscordUrl} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-indigo-500 px-2.5 py-2 text-[9px] font-extrabold text-white transition hover:bg-indigo-400 sm:gap-1.5 sm:px-3 sm:text-[10px]"><MessageCircle size={13}/> Join Discord</a>
+        <div role="note" className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-amber-300/30 bg-amber-300/[.08] p-2.5 sm:mb-5 sm:gap-2.5 sm:p-3">
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">Required</span><div className="text-[11px] font-extrabold text-white sm:text-xs">Join the WhatsApp group</div></div><p className="mt-1 hidden text-[10px] leading-4 text-slate-300 sm:block">Join using this link to receive future tournament updates: <span className="font-semibold text-amber-100">JxesDN4y8fB6QT68aygFWr</span></p><p className="mt-1 text-[9px] text-slate-300 sm:hidden">Required for future tournament updates</p></div>
+          <a href={tournamentUpdatesGroupUrl} onClick={(event) => { event.preventDefault(); openWhatsAppTab(tournamentUpdatesGroupUrl); }} className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-[#128c58] px-2.5 py-2 text-[9px] font-extrabold text-white transition hover:bg-[#16a367] sm:gap-1.5 sm:px-3 sm:text-[10px]"><MessageCircle size={13}/> Join group</a>
         </div>
 
         {/* Registration ID Banner */}
