@@ -507,7 +507,7 @@ export async function createTournament(data: Partial<Tournament>): Promise<strin
     status: 'open',
     redirectLink: data.redirectLink ?? '',
     redirectLinkEnabled: data.redirectLinkEnabled ?? true,
-    redirectButtonText: data.redirectButtonText || 'Join WhatsApp / Discord Group',
+    redirectButtonText: data.redirectButtonText || 'Join Discord Server',
     map: data.map || 'Purgatory',
     groupsEnabled: data.groupsEnabled === true,
     unlimitedGroups: data.unlimitedGroups === true,

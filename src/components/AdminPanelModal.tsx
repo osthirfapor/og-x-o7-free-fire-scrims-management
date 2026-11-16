@@ -1808,7 +1808,7 @@ export const AdminPanelModal: React.FC<Props> = ({
                     </label>
                     <input
                       type="url"
-                      placeholder="https://discord.gg/your-scrims or https://chat.whatsapp.com/..."
+                      placeholder="https://discord.gg/your-server"
                       value={redirectLink}
                       onChange={(e) => setRedirectLink(e.target.value)}
                       className="w-full bg-[#0b0c10] border border-[#2a2b36] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
